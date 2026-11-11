@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use walkit_generator::params::{parse_color, Params};
+use walkit_cli::params::{parse_color, Params};
 
 #[test]
 fn the_museum_file_spells_out_the_defaults() {
     let text = include_str!("../params/museum.json");
     assert_eq!(Params::from_json(text).unwrap(), Params::default());
-    // the file is what `walkit-generator params` prints
+    // the file is what `walkit params` prints
     assert_eq!(text.replace("\r\n", "\n"), Params::default().to_json());
 }
 

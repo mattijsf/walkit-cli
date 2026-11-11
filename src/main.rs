@@ -12,14 +12,14 @@ use clap::{Parser, Subcommand, ValueEnum};
 use md5::{Digest, Md5};
 use walkit::files::MemoryFiles;
 
-use walkit_generator::compare::compare;
-use walkit_generator::input::{self, Source};
-use walkit_generator::output;
-use walkit_generator::params::Params;
-use walkit_generator::shot::shoot;
-use walkit_generator::skin::{self, Kind, Skin};
+use walkit_cli::compare::compare;
+use walkit_cli::input::{self, Source};
+use walkit_cli::output;
+use walkit_cli::params::Params;
+use walkit_cli::shot::shoot;
+use walkit_cli::skin::{self, Kind, Skin};
 
-/// Renders preview images of Winamp skins with the walkit engine.
+/// Command-line tool for Winamp skins, built on the walkit engine.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
@@ -374,7 +374,7 @@ fn run_compare(args: Compare) -> Result<bool, String> {
     let a = open(&args.image)?;
     let b = open(&args.reference)?;
     let (all, picture) = compare(&a, &b, args.tolerance, args.diff.is_some())?;
-    let line = |label: &str, c: &walkit_generator::compare::Comparison| {
+    let line = |label: &str, c: &walkit_cli::compare::Comparison| {
         println!(
             "{label}: {:.2}% the same, {:.2}% within {} ({} of {} pixels differ, largest difference {})",
             c.same_percent(),

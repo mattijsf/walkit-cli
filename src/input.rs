@@ -77,7 +77,7 @@ impl std::fmt::Display for Source {
 fn download(url: &str) -> Result<Vec<u8>, String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(TIMEOUT))
-        .user_agent(concat!("walkit-generator/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("walkit-cli/", env!("CARGO_PKG_VERSION")))
         .build()
         .into();
     let mut response = agent.get(url).call().map_err(|e| e.to_string())?;

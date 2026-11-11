@@ -1,14 +1,18 @@
 [package]
-name = "walkit-generator"
-description = "Renders preview images and thumbnails of Winamp skins with the walkit engine"
+name = "walkit-cli"
+description = "Command-line tool for Winamp skins on the walkit engine: renders preview images and thumbnails"
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/mattijsf/walkit-generator"
+repository = "https://github.com/mattijsf/walkit-cli"
 publish = false
 readme = "README.md"
 keywords = ["winamp", "skin", "screenshot", "wsz", "wal"]
 categories = ["command-line-utilities", "multimedia::images"]
+
+[[bin]]
+name = "walkit"
+path = "src/main.rs"
 
 [dependencies]
 walkit = { git = "https://github.com/mattijsf/walkit", tag = "v0.9.0" }

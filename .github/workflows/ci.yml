@@ -20,7 +20,7 @@ jobs:
   # tests it again on every target, so the push run is skipped for it.
   lint:
     name: Format and lint
-    if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}
+    if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,7 +51,7 @@ jobs:
 
   test:
     name: Test (${{ matrix.os }})
-    if: ${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}
+    if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

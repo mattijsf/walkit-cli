@@ -1,0 +1,118 @@
+{
+  "output": {
+    "scale": 1,
+    "background": null,
+    "thumbnails": []
+  },
+  "classic": {
+    "width": 275,
+    "height": 348,
+    "winamp": "2.91",
+    "main": {
+      "show": true,
+      "x": 0,
+      "y": 0
+    },
+    "equalizer": {
+      "show": true,
+      "x": 0,
+      "y": 116
+    },
+    "playlist": {
+      "show": true,
+      "x": 0,
+      "y": 232,
+      "width": 275,
+      "height": 116
+    },
+    "playlist_font_size": null,
+    "time_remaining": false
+  },
+  "modern": {
+    "screen": [
+      1440,
+      900
+    ],
+    "settle_ms": 1000,
+    "color_theme": null,
+    "trim": true
+  },
+  "player": {
+    "status": "playing",
+    "position": 3.0,
+    "volume": 78,
+    "balance": 0,
+    "shuffle": true,
+    "repeat": true,
+    "kbps": 128,
+    "khz": 44,
+    "channels": 2
+  },
+  "equalizer": {
+    "on": true,
+    "auto": true,
+    "preamp": 56,
+    "bands": [
+      52,
+      74,
+      83,
+      91,
+      80,
+      54,
+      23,
+      19,
+      34,
+      75
+    ]
+  },
+  "vis": {
+    "mode": "analyzer",
+    "bars": [
+      11.75,
+      11.0625,
+      8.5,
+      7.3125,
+      6.75,
+      6.4375,
+      6.25,
+      5.875,
+      5.625,
+      5.25,
+      5.125,
+      4.875,
+      4.8125,
+      4.375,
+      3.625,
+      1.5625
+    ],
+    "peaks": false
+  },
+  "playlist": {
+    "tracks": [
+      {
+        "artist": "DJ Mike Llama",
+        "title": "Llama Whipping Intro",
+        "seconds": 5
+      },
+      {
+        "artist": "Marilyn Manson",
+        "title": "Rock Is Dead",
+        "seconds": 191
+      },
+      {
+        "artist": "Propellerheads",
+        "title": "Spybreak! (Short One)",
+        "seconds": 240
+      },
+      {
+        "artist": "Ministry",
+        "title": "Bad Blood",
+        "seconds": 300
+      }
+    ],
+    "current": 0,
+    "selected": [
+      2
+    ]
+  }
+}

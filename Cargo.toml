@@ -1,0 +1,33 @@
+[package]
+name = "walkit-generator"
+description = "Renders preview images and thumbnails of Winamp skins with the walkit engine"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/mattijsf/walkit-generator"
+publish = false
+readme = "README.md"
+keywords = ["winamp", "skin", "screenshot", "wsz", "wal"]
+categories = ["command-line-utilities", "multimedia::images"]
+
+[dependencies]
+walkit = { git = "https://github.com/mattijsf/walkit", tag = "v0.9.0" }
+fontdue = "0.9.5"
+image = { version = "0.25.10", default-features = false, features = ["png", "bmp", "gif", "jpeg"] }
+zip = { version = "2.6.1", default-features = false, features = ["deflate"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+ureq = "3"
+md-5 = "0.10"
+
+[profile.release]
+opt-level = 3
+# a panic in the engine unwinds to the batch, which reports it as that skin's failure
+panic = "unwind"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }

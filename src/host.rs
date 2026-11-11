@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The host: the skin's pictures, decoded with the `image` crate, and its text, measured and
-//! drawn with `fontdue`. The engine reads them through [`Host`]; the renderer reads the same
+//! drawn by [`crate::text`]. The engine reads them through [`Host`]; the renderer reads the same
 //! [`Assets`], so each picture and font is decoded once. The free fonts that stand in for
 //! Arial and Tahoma lie under the skin's files as `fonts/LiberationSans.ttf` and the like.
 
@@ -9,11 +9,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use fontdue::{Font, FontSettings, Metrics};
 use walkit::draw::FontDef;
 use walkit::files::SkinFiles;
 use walkit::gdi::{em_size, FontFace};
 use walkit::host::SkinHost;
+
+use crate::text::Font;
 
 /// The font for text that names none, and the one a missing font falls back to: the stand-in
 /// for Arial, read from under the skin's files.
@@ -39,51 +40,9 @@ impl Picture {
     }
 }
 
-/// A drawn glyph: where it sits from the pen, and its coverage, one byte per pixel.
-pub type Glyph = Rc<(Metrics, Vec<u8>)>;
-
-/// A font with the glyphs drawn so far, by character and pixel size.
-pub struct FontEntry {
-    pub font: Font,
-    glyphs: RefCell<HashMap<(char, u32), Glyph>>,
-}
-
-impl FontEntry {
-    fn new(font: Font) -> Rc<FontEntry> {
-        Rc::new(FontEntry {
-            font,
-            glyphs: RefCell::default(),
-        })
-    }
-
-    /// The coverage bitmap of `c` at `px` pixels, drawn once.
-    pub fn glyph(&self, c: char, px: f32) -> Glyph {
-        let key = (c, px.to_bits());
-        self.glyphs
-            .borrow_mut()
-            .entry(key)
-            .or_insert_with(|| Rc::new(self.font.rasterize(c, px)))
-            .clone()
-    }
-
-    /// How far `text` advances at `px` pixels, with kerning.
-    pub fn advance(&self, text: &str, px: f32) -> f32 {
-        let mut width = 0.0;
-        let mut last = None;
-        for c in text.chars() {
-            if let Some(prev) = last {
-                width += self.font.horizontal_kern(prev, c, px).unwrap_or(0.0);
-            }
-            width += self.font.metrics(c, px).advance_width;
-            last = Some(c);
-        }
-        width
-    }
-}
-
 /// The font a run of text draws in, and whether the renderer thickens it for bold.
 pub struct TextFace {
-    pub font: Rc<FontEntry>,
+    pub font: Rc<Font>,
     pub fake_bold: bool,
 }
 
@@ -91,7 +50,7 @@ pub struct TextFace {
 pub struct Assets {
     files: Box<dyn SkinFiles>,
     pictures: HashMap<String, Option<Rc<Picture>>>,
-    fonts: HashMap<String, Option<Rc<FontEntry>>>,
+    fonts: HashMap<String, Option<Rc<Font>>>,
 }
 
 impl Assets {
@@ -153,7 +112,7 @@ impl Assets {
     }
 
     /// A TrueType file among the skin's files.
-    fn skin_font(&mut self, file: &str) -> Option<Rc<FontEntry>> {
+    fn skin_font(&mut self, file: &str) -> Option<Rc<Font>> {
         if file.is_empty() {
             return None;
         }
@@ -161,7 +120,7 @@ impl Assets {
         if let Some(f) = self.fonts.get(&key) {
             return f.clone();
         }
-        let font = self.files.read(file).and_then(|b| parse_font(&b));
+        let font = self.files.read(file).and_then(Font::parse);
         self.fonts.insert(key, font.clone());
         font
     }
@@ -185,10 +144,9 @@ fn decode(bytes: &[u8]) -> Option<Picture> {
     })
 }
 
-fn parse_font(bytes: &[u8]) -> Option<Rc<FontEntry>> {
-    Font::from_bytes(bytes, FontSettings::default())
-        .ok()
-        .map(FontEntry::new)
+/// The whole pixels per em Windows draws a skin's font size at.
+pub fn pixels(size: i32) -> u32 {
+    em_size(size).max(1.0) as u32
 }
 
 /// What the engine asks of the tool. It shares [`Assets`] with the renderer and keeps
@@ -204,7 +162,11 @@ impl Host {
     fn measure(&mut self, text: &str, font: Option<&FontDef>, size: i32, bold: bool) -> f32 {
         let face = self.assets.borrow_mut().face(font, bold);
         match face {
-            Some(face) => face.font.advance(text, em_size(size)),
+            Some(face) => {
+                // a font without a bold cut is drawn twice, a pixel apart
+                let bold = i32::from(face.fake_bold && !text.is_empty());
+                (face.font.advance(text, pixels(size)) + bold) as f32
+            }
             None => text.chars().count() as f32 * size as f32 * 0.6,
         }
     }
@@ -246,8 +208,7 @@ impl SkinHost for Host {
         bold: bool,
     ) -> Option<(f32, f32)> {
         let face = self.assets.borrow_mut().face(font, bold)?;
-        let line = face.font.font.horizontal_line_metrics(em_size(size))?;
-        Some((line.ascent, -line.descent))
+        Some(face.font.line(pixels(size)))
     }
 
     fn font_file(&mut self, file: &str) -> Option<Rc<[u8]>> {

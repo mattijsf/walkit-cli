@@ -5,9 +5,8 @@
 //! is `scale` device pixels across and down, and pictures scale by nearest pixels.
 
 use walkit::draw::{DrawCmd, Gamma, Rect, Region, TextCmd};
-use walkit::gdi::em_size;
 
-use crate::host::Assets;
+use crate::host::{pixels, Assets};
 
 /// The image being drawn: `w` x `h` device pixels, rows top first, each `0xAARRGGBB` with
 /// the color not multiplied by the alpha.
@@ -301,46 +300,43 @@ fn draw_text(canvas: &mut Canvas, assets: &mut Assets, pen: &mut Pen, text: &Tex
         return;
     };
     let s = pen.scale;
-    let px = em_size(text.size) * s as f32;
-    let left = (pen.origin.0 as f32 + text.x) * s as f32;
-    let baseline = (pen.origin.1 as f32 + text.baseline) * s as f32;
+    let px = pixels(text.size) * s as u32;
+    // Windows places text on whole pixels
+    let left = ((pen.origin.0 as f32 + text.x) * s as f32).round() as i32;
+    let baseline = ((pen.origin.1 as f32 + text.baseline) * s as f32).round() as i32;
     pen.clips.push(pen.device(text.rect).cut_to(&pen.clip()));
     let mut runs = Vec::new();
     if let Some(shadow) = text.shadow {
-        let dx = (text.shadow_dx * s) as f32;
-        let dy = (text.shadow_dy * s) as f32;
-        runs.push((left + dx, baseline + dy, shadow.0));
+        runs.push((
+            left + text.shadow_dx * s,
+            baseline + text.shadow_dy * s,
+            shadow.0,
+        ));
     }
     runs.push((left, baseline, text.color.0));
     // a font without a bold cut is drawn twice, a pixel apart
-    let strokes: &[f32] = if face.fake_bold {
-        &[0.0, s as f32]
-    } else {
-        &[0.0]
-    };
+    let strokes: &[i32] = if face.fake_bold { &[0, s] } else { &[0] };
     for (x0, y0, color) in runs {
         for &dx in strokes {
             let mut x = x0 + dx;
             let mut last = None;
             for c in text.text.chars() {
                 if let Some(prev) = last {
-                    x += face.font.font.horizontal_kern(prev, c, px).unwrap_or(0.0);
+                    x += face.font.kerning(prev, c, px);
                 }
+                last = Some(c);
                 let glyph = face.font.glyph(c, px);
-                let (m, coverage) = (&glyph.0, &glyph.1);
-                let gx = (x + m.xmin as f32).round() as i32;
-                let gy = (y0 - (m.height as i32 + m.ymin) as f32).round() as i32;
-                for row in 0..m.height {
-                    for col in 0..m.width {
-                        let cover = coverage[row * m.width + col] as i32;
+                let (gx, gy) = (x + glyph.left, y0 - glyph.top);
+                for row in 0..glyph.h {
+                    for col in 0..glyph.w {
+                        let cover = u32::from(glyph.coverage[row * glyph.w + col]);
                         if cover > 0 {
-                            let argb = ((cover as u32) << 24) | (color & 0x00ff_ffff);
+                            let argb = (cover << 24) | (color & 0x00ff_ffff);
                             pen.blend(canvas, gx + col as i32, gy + row as i32, argb, text.alpha);
                         }
                     }
                 }
-                x += m.advance_width;
-                last = Some(c);
+                x += glyph.advance;
             }
         }
     }

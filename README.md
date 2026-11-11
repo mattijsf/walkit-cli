@@ -241,26 +241,28 @@ under them, compared pixel by pixel with the museum's screenshot of the same ski
 
 | Skin | Identical pixels | Outside the playlist's text rows |
 | --- | --- | --- |
-| base-2.91 | 93.99% | 98.14% |
-| Winamp3_Classified_v5.5 | 93.98% | 98.11% |
-| Winamp5_Classified_v5.5 | 93.55% | 97.58% |
-| Bento_Classified | 93.90% | 97.97% |
-| Garfield | 93.68% | 97.77% |
-| Zelda_Amp_3 | 94.25% | 98.44% |
-| Deus_Ex_Amp_by_AJ | 94.87% | 99.08% |
-| the_Cube_v2_by_Kuki | 94.15% | 98.42% |
-| Microchip_2 | 93.57% | 98.09% |
+| base-2.91 | 94.68% | 98.14% |
+| Winamp3_Classified_v5.5 | 94.66% | 98.11% |
+| Winamp5_Classified_v5.5 | 94.23% | 97.58% |
+| Bento_Classified | 94.56% | 97.97% |
+| Garfield | 94.37% | 97.77% |
+| Zelda_Amp_3 | 94.94% | 98.44% |
+| Deus_Ex_Amp_by_AJ | 95.52% | 99.08% |
+| the_Cube_v2_by_Kuki | 94.10% | 98.42% |
+| Microchip_2 | 94.38% | 98.09% |
 
 To the eye the images are the same picture. Where they differ, the same state was set up in
 Winamp 5.666 in a virtual machine (the same skin, tracks, position, volume, equalizer and
 selection, playlist font at 10) and both images were compared with what Winamp draws. Each
 difference below is one where the tool follows Winamp instead of the museum's image.
 
-1. **Playlist text.** About 4,200 of the roughly 5,800 differing pixels are in the four
-   playlist rows. The museum's text is drawn by a browser, the tool's by its own
-   rasterizer with Liberation Sans standing in for Arial, so the letters' edges cannot
-   match pixel for pixel. The rows also sit one pixel higher than in the museum's image,
-   which is where Winamp puts them.
+1. **Playlist text.** About 3,300 of the roughly 5,100 differing pixels are in the four
+   playlist rows. The museum's text is drawn by a browser and smoothed. Winamp's is not:
+   Windows fits Arial to the pixel grid at this size and leaves it unsmoothed, and the tool
+   draws text the same way (see [Fonts](#fonts)). With Arial itself passed in `--fonts`,
+   the four rows came out identical to Winamp's, pixel for pixel; with the built-in
+   stand-in the letters are as crisp but shaped a little differently. The rows also sit
+   one pixel higher than in the museum's image, which is where Winamp puts them.
 2. **Slider thumbs.** The slider thumbs in the museum's images land up to three pixels
    from Winamp's: the volume thumb is three pixels further right in the
    museum's image, the position thumb one or two, the equalizer thumbs one pixel off, and
@@ -290,6 +292,30 @@ Skins name Windows fonts, mostly Arial and Tahoma. The tool draws them with free
 stand-ins that are compiled into the binary: Liberation Sans for Arial (SIL Open Font
 License) and DejaVu Sans Condensed for Tahoma (Bitstream Vera license). The font files and
 their licenses are in [`fonts/`](fonts). A skin's own TrueType fonts are read from the skin.
+
+Text is drawn the way Windows draws it for Winamp:
+
+- The font's own hinting fits each letter to the pixel grid.
+- Letters advance by whole pixels, with the widths the font's device tables give and the
+  kerning of its `kern` table.
+- The font's `gasp` table says at which sizes letters are smoothed. Arial from 9 to 17
+  pixels, which covers the playlist, is not smoothed at all.
+
+Liberation Sans has Arial's widths but not its letter shapes, and DejaVu Sans Condensed
+only resembles Tahoma. To draw with the real fonts, pass a folder that holds them under the names Windows gives them
+(`arial.ttf`, `arialbd.ttf`, `tahoma.ttf`, `tahomabd.ttf`; any of the four):
+
+```
+walkit render skin.wsz --fonts /path/to/fonts
+```
+
+On Windows they are in `C:\Windows\Fonts`. They are Microsoft's and are not part of this
+repository.
+
+Checked against Winamp 5.666 in a virtual machine, with Arial at the playlist's size: a
+playlist of twelve test lines (both alphabets, digits, punctuation, pangrams) differed in 5
+pixels, all at the foot of a `V` or `v`. Smoothed sizes and Tahoma have not been compared
+with Winamp.
 
 ## Development
 

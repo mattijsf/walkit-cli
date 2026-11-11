@@ -86,6 +86,26 @@ pub fn unzip(bytes: &[u8]) -> Result<MemoryFiles, String> {
     Ok(all.in_folder(&folder))
 }
 
+/// The Windows fonts skins name without a file, by file name, and the stand-in each replaces.
+const WINDOWS_FONTS: [(&str, &str); 4] = [
+    ("arial.ttf", "fonts/LiberationSans.ttf"),
+    ("arialbd.ttf", "fonts/LiberationSans-Bold.ttf"),
+    ("tahoma.ttf", "fonts/DejaVuSansCondensed.ttf"),
+    ("tahomabd.ttf", "fonts/DejaVuSansCondensed-Bold.ttf"),
+];
+
+/// Where a font file of the caller's goes among the skin's files, by its name: in the place
+/// of the stand-in for that Windows font. `None` for a file that replaces none.
+pub fn font_path(name: &str) -> Option<&'static str> {
+    let name = name.to_lowercase();
+    WINDOWS_FONTS
+        .iter()
+        .find(|(windows, stand_in)| {
+            name == *windows || stand_in.to_lowercase().ends_with(&format!("/{name}"))
+        })
+        .map(|(_, stand_in)| *stand_in)
+}
+
 /// The stand-in fonts as skin files.
 fn fonts() -> MemoryFiles {
     let mut fonts = MemoryFiles::new();
@@ -157,6 +177,18 @@ impl Skin {
             under: under.cloned(),
             fonts: fonts(),
         })
+    }
+
+    /// Puts the caller's own fonts in the place of the stand-ins: `(file name, bytes)` pairs,
+    /// named as Windows names them (`arial.ttf`, `arialbd.ttf`, `tahoma.ttf`,
+    /// `tahomabd.ttf`) or as the stand-ins are. Other files are left out.
+    pub fn with_fonts(mut self, fonts: &[(String, Vec<u8>)]) -> Skin {
+        for (name, bytes) in fonts {
+            if let Some(path) = font_path(name) {
+                self.fonts.insert(path, bytes.clone());
+            }
+        }
+        self
     }
 
     /// The skin's files with the fonts among them, over the base. The engine and the host

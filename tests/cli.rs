@@ -166,6 +166,39 @@ fn wrong_use_exits_with_2() {
 }
 
 #[test]
+fn a_fonts_folder_replaces_the_stand_ins() {
+    let dir = Scratch::new("fonts");
+    let fonts = dir.path("fonts");
+    std::fs::create_dir_all(&fonts).unwrap();
+    // any other font under Arial's name: the playlist's letters change
+    std::fs::copy(
+        "fonts/DejaVuSansCondensed-Bold.ttf",
+        fonts.join("Arial.ttf"),
+    )
+    .unwrap();
+    let (plain, own) = (dir.path("plain.png"), dir.path("own.png"));
+    assert!(run(&["render", CLASSIC, "-o", plain.to_str().unwrap()])
+        .status
+        .success());
+    let result = run(&[
+        "render",
+        CLASSIC,
+        "-o",
+        own.to_str().unwrap(),
+        "--fonts",
+        fonts.to_str().unwrap(),
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    assert_ne!(std::fs::read(&plain).unwrap(), std::fs::read(&own).unwrap());
+
+    let empty = dir.path("empty");
+    std::fs::create_dir_all(&empty).unwrap();
+    let none = run(&["render", CLASSIC, "--fonts", empty.to_str().unwrap()]);
+    assert_eq!(none.status.code(), Some(2));
+    assert!(text(&none.stderr).contains("arial.ttf"));
+}
+
+#[test]
 fn params_prints_the_museum_file() {
     let result = run(&["params"]);
     assert!(result.status.success());

@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::io::Read;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -68,6 +68,10 @@ struct Render {
     /// A zip of Winamp's wasabi folder (file or address) laid under every modern skin.
     #[arg(long, value_name = "ZIP")]
     wasabi: Option<String>,
+    /// A folder of TrueType fonts to draw with in place of the built-in stand-ins: arial.ttf,
+    /// arialbd.ttf, tahoma.ttf and tahomabd.ttf, as Windows names them.
+    #[arg(long, value_name = "DIR")]
+    fonts: Option<PathBuf>,
     /// How many skins render at once.
     #[arg(short, long, default_value_t = default_jobs())]
     jobs: usize,
@@ -143,6 +147,7 @@ struct Batch {
     params: Params,
     base: Option<Vec<u8>>,
     wasabi: Option<Vec<u8>>,
+    fonts: Vec<(String, Vec<u8>)>,
     out_dir: PathBuf,
     verbose: bool,
     quiet: bool,
@@ -193,6 +198,10 @@ fn render(args: Render) -> Result<bool, String> {
     };
     let base = under("--base", &args.base)?;
     let wasabi = under("--wasabi", &args.wasabi)?;
+    let fonts = match &args.fonts {
+        Some(dir) => read_fonts(dir)?,
+        None => Vec::new(),
+    };
     let out_dir = args.out_dir.clone().unwrap_or_else(|| PathBuf::from("."));
     // names are given out in input order, so a batch names its files the same on every run:
     // the second "Skin.wsz" becomes Skin-2.png
@@ -224,6 +233,7 @@ fn render(args: Render) -> Result<bool, String> {
         params,
         base,
         wasabi,
+        fonts,
         out_dir,
         verbose: args.verbose,
         quiet: args.quiet,
@@ -269,6 +279,29 @@ fn file_name(name: &str) -> String {
     } else {
         cleaned
     }
+}
+
+/// The fonts in `dir` that replace a stand-in, as `(file name, bytes)`.
+fn read_fonts(dir: &Path) -> Result<Vec<(String, Vec<u8>)>, String> {
+    let entries = std::fs::read_dir(dir).map_err(|e| format!("--fonts {}: {e}", dir.display()))?;
+    let mut fonts = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if skin::font_path(&name).is_none() {
+            continue;
+        }
+        let path = entry.path();
+        let bytes = std::fs::read(&path).map_err(|e| format!("--fonts {}: {e}", path.display()))?;
+        fonts.push((name, bytes));
+    }
+    if fonts.is_empty() {
+        return Err(format!(
+            "--fonts {}: no arial.ttf, arialbd.ttf, tahoma.ttf or tahomabd.ttf in it",
+            dir.display()
+        ));
+    }
+    fonts.sort();
+    Ok(fonts)
 }
 
 /// Takes jobs until none are left.
@@ -328,7 +361,7 @@ fn render_one(
     wasabi: Option<&MemoryFiles>,
 ) -> Result<Done, String> {
     let bytes = job.source.read()?;
-    let skin = Skin::open(&bytes, base, wasabi)?;
+    let skin = Skin::open(&bytes, base, wasabi)?.with_fonts(&batch.fonts);
     let mut warnings = Vec::new();
     let missing = skin.missing_sheets();
     if !missing.is_empty() {

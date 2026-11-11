@@ -41,7 +41,7 @@ pub fn shoot(skin: &Skin, name: &str, params: &Params) -> Result<Shot, String> {
         assets: assets.clone(),
         log: log.clone(),
     };
-    // the clock only moves when the generator steps it, so every run draws the same frame
+    // the clock only moves when the tool steps it, so every run draws the same frame
     let now = Rc::new(Cell::new(0i64));
     let clock: Clock = {
         let now = now.clone();

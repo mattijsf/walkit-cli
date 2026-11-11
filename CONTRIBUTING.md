@@ -78,11 +78,11 @@ binaries on each platform and attaches them, each with a SHA-256 checksum:
 
 | Target | Archive |
 | --- | --- |
-| Linux x86-64 | `walkit-generator-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz` |
-| Linux ARM64 | `walkit-generator-vX.Y.Z-aarch64-unknown-linux-gnu.tar.gz` |
-| macOS Apple silicon | `walkit-generator-vX.Y.Z-aarch64-apple-darwin.tar.gz` |
-| macOS Intel | `walkit-generator-vX.Y.Z-x86_64-apple-darwin.tar.gz` |
-| Windows x86-64 | `walkit-generator-vX.Y.Z-x86_64-pc-windows-msvc.zip` |
+| Linux x86-64 | `walkit-cli-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux ARM64 | `walkit-cli-vX.Y.Z-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS Apple silicon | `walkit-cli-vX.Y.Z-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `walkit-cli-vX.Y.Z-x86_64-apple-darwin.tar.gz` |
+| Windows x86-64 | `walkit-cli-vX.Y.Z-x86_64-pc-windows-msvc.zip` |
 
 For release-please to open its pull request, the repository setting "Allow GitHub Actions to
 create and approve pull requests" (Settings, Actions, General) has to be on.

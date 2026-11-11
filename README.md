@@ -1,4 +1,4 @@
-# walkit-generator
+# walkit-cli
 
 A command-line tool that renders preview images and thumbnails of Winamp skins: classic
 skins (`.wsz`) and modern skins (`.wal`). It runs the skin in the
@@ -12,21 +12,21 @@ screenshots: 275 by 348 pixels, main window, equalizer and playlist stacked, tra
 where the skin is.
 
 ```
-walkit-generator render Zelda_Amp_3.wsz
+walkit render Zelda_Amp_3.wsz
 ```
 
 ## Install
 
 Download a binary for Linux, macOS or Windows from the
-[releases](https://github.com/mattijsf/walkit-generator/releases), or build it with a stable
+[releases](https://github.com/mattijsf/walkit-cli/releases), or build it with a stable
 [Rust](https://rustup.rs) toolchain:
 
 ```
-cargo install --git https://github.com/mattijsf/walkit-generator
+cargo install --git https://github.com/mattijsf/walkit-cli
 ```
 
 From a checkout, `cargo build --release` leaves the binary at
-`target/release/walkit-generator`.
+`target/release/walkit`.
 
 The binary is self-contained. The fonts it needs are built in.
 
@@ -35,9 +35,9 @@ The binary is self-contained. The fonts it needs are built in.
 ### One skin
 
 ```
-walkit-generator render skin.wsz                    # writes ./skin.png
-walkit-generator render skin.wsz -o preview.png
-walkit-generator render https://example.org/skin.wal -o preview.png
+walkit render skin.wsz                    # writes ./skin.png
+walkit render skin.wsz -o preview.png
+walkit render https://example.org/skin.wal -o preview.png
 ```
 
 ### Many skins
@@ -48,9 +48,9 @@ more inputs from a file, one per line; `-` reads them from standard input. Empty
 lines starting with `#` are skipped.
 
 ```
-walkit-generator render skins/ -d previews/
-walkit-generator render --list skins.txt -d previews/ --name md5
-find . -name '*.wsz' | walkit-generator render --list - -d previews/ --jobs 8
+walkit render skins/ -d previews/
+walkit render --list skins.txt -d previews/ --name md5
+find . -name '*.wsz' | walkit render --list - -d previews/ --jobs 8
 ```
 
 Each preview is named after its skin: `Zelda_Amp_3.wsz` becomes `Zelda_Amp_3.png`, and a
@@ -70,12 +70,12 @@ a skin) is reported on standard error and the batch goes on. The exit code tells
 ### Base skin and wasabi base
 
 Many classic skins leave bitmaps out, most often the equalizer or the playlist. Winamp draws
-those parts from its base skin. Pass a complete classic skin with `--base` and the generator
+those parts from its base skin. Pass a complete classic skin with `--base` and the tool
 does the same; without it those parts stay empty and a warning names the missing bitmaps.
 Winamp's base skin is in the museum, so this works:
 
 ```
-walkit-generator render skins/ -d previews/ \
+walkit render skins/ -d previews/ \
   --base https://r2.webampskins.org/skins/5e4f10275dcb1fb211d4a8b4f1bda236.wsz
 ```
 
@@ -104,7 +104,7 @@ the skin itself larger.
 ### Comparing images
 
 ```
-walkit-generator compare ours.png reference.png --bands 116 --diff diff.png
+walkit compare ours.png reference.png --bands 116 --diff diff.png
 ```
 
 prints the share of identical pixels, for the whole image and per band of rows (116 rows is
@@ -117,7 +117,7 @@ museum and measures each against the museum's screenshot.
 `--params file.json` sets what the preview shows. Every field is optional: a file names only
 what it changes, and everything else keeps the museum's value. An unknown field is an error.
 
-`walkit-generator params` prints the defaults as a complete file. The same file is in the
+`walkit params` prints the defaults as a complete file. The same file is in the
 repository as [`params/museum.json`](params/museum.json):
 
 ```json
@@ -218,7 +218,7 @@ at commit `7e73a9b`.
 | Winamp 2.91's look, playlist font at 10 pixels | Webamp follows Winamp 2.9; its playlist rows match Winamp's at font size 10. |
 | Nearest pixels when a thumbnail grows, Lanczos when it shrinks | `packages/skin-database/app/og/ogImages.tsx`. |
 
-The museum compresses its PNGs with optipng. The generator uses the PNG encoder's best
+The museum compresses its PNGs with optipng. The tool uses the PNG encoder's best
 setting. Both are lossless, so the pixels are the same either way.
 
 ### Modern skins
@@ -229,7 +229,7 @@ the museum has for a modern skin is the one its author put in the archive and na
 `skin.xml` (`screenshot_url` in `api/graphql/resolvers/ModernSkinResolver.ts`), and many
 skins have none.
 
-With no convention to follow, the generator uses this one:
+With no convention to follow, the tool uses this one:
 
 - The skin opens the windows it opens by itself, in its default layout, at its own size.
 - It gets the same player state as a classic skin: the same song, position, volume,
@@ -258,10 +258,10 @@ under them, compared pixel by pixel with the museum's screenshot of the same ski
 To the eye the images are the same picture. Where they differ, the same state was set up in
 Winamp 5.666 in a virtual machine (the same skin, tracks, position, volume, equalizer and
 selection, playlist font at 10) and both images were compared with what Winamp draws. Each
-difference below is one where the generator follows Winamp instead of the museum's image.
+difference below is one where the tool follows Winamp instead of the museum's image.
 
 1. **Playlist text.** About 4,200 of the roughly 5,800 differing pixels are in the four
-   playlist rows. The museum's text is drawn by Chrome, the generator's by its own
+   playlist rows. The museum's text is drawn by Chrome, the tool's by its own
    rasterizer with Liberation Sans standing in for Arial, so the letters' edges cannot
    match pixel for pixel. The rows also sit one pixel higher than in the museum's image,
    which is where Winamp puts them.
@@ -277,9 +277,9 @@ difference below is one where the generator follows Winamp instead of the museum
 4. **The cell left of the time.** Winamp draws the blank cell of `numbers.bmp` where the
    minus sign goes. Webamp leaves the main window's background there. On skins where the
    two differ, a few dozen pixels do (35 on the base skin).
-5. **Window shapes.** For a skin with a `region.txt`, the generator cuts the windows as
+5. **Window shapes.** For a skin with a `region.txt`, the tool cuts the windows as
    Winamp does. On Microchip_2 the museum's image leaves 689 pixels opaque that Winamp
-   cuts away; the generator's shape matched Winamp's exactly.
+   cuts away; the tool's shape matched Winamp's exactly.
 6. **The equalizer's curve.** The line in the equalizer's graph differs from the museum's
    in about 60 pixels. Here neither image matches Winamp: walkit's curve differs from
    Winamp's in 108 pixels for these slider values, the museum's in 90. This is a known gap
@@ -290,7 +290,7 @@ closed, and the main window has the focus.
 
 ## Fonts
 
-Skins name Windows fonts, mostly Arial and Tahoma. The generator draws them with free
+Skins name Windows fonts, mostly Arial and Tahoma. The tool draws them with free
 stand-ins that are compiled into the binary: Liberation Sans for Arial (SIL Open Font
 License) and DejaVu Sans Condensed for Tahoma (Bitstream Vera license). The font files and
 their licenses are in [`fonts/`](fonts). A skin's own TrueType fonts are read from the skin.

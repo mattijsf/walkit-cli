@@ -7,7 +7,7 @@ set -euo pipefail
 
 cdn=https://r2.webampskins.org
 base_md5=5e4f10275dcb1fb211d4a8b4f1bda236 # Winamp's base skin
-tool=${WALKIT_GENERATOR:-target/release/walkit-generator}
+tool=${WALKIT:-target/release/walkit}
 out=out/museum
 
 if [ $# -eq 0 ]; then

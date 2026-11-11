@@ -66,18 +66,18 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          name="walkit-generator-$TAG-$TARGET"
+          name="walkit-cli-$TAG-$TARGET"
           mkdir -p "dist/$name/fonts" "dist/$name/params"
           cp README.md LICENSE CHANGELOG.md "dist/$name/"
           cp fonts/LICENSE-*.txt "dist/$name/fonts/"
           cp params/museum.json "dist/$name/params/"
           cd dist
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cp "../target/$TARGET/release/walkit-generator.exe" "$name/"
+            cp "../target/$TARGET/release/walkit.exe" "$name/"
             7z a "$name.zip" "$name" > /dev/null
             archive="$name.zip"
           else
-            cp "../target/$TARGET/release/walkit-generator" "$name/"
+            cp "../target/$TARGET/release/walkit" "$name/"
             tar -czf "$name.tar.gz" "$name"
             archive="$name.tar.gz"
           fi

@@ -2,10 +2,10 @@
 
 //! Renders the two original skins in `tests/skins` through the library.
 
-use walkit_generator::output;
-use walkit_generator::params::{Params, Thumbnail};
-use walkit_generator::shot::{shoot, Shot};
-use walkit_generator::skin::{unzip, Kind, Skin};
+use walkit_cli::output;
+use walkit_cli::params::{Params, Thumbnail};
+use walkit_cli::shot::{shoot, Shot};
+use walkit_cli::skin::{unzip, Kind, Skin};
 
 const CLASSIC: &[u8] = include_bytes!("skins/walkit-classic.wsz");
 const MODERN: &[u8] = include_bytes!("skins/walkit-modern.wal");

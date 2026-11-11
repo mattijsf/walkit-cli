@@ -191,7 +191,7 @@ fn parse_font(bytes: &[u8]) -> Option<Rc<FontEntry>> {
         .map(FontEntry::new)
 }
 
-/// What the engine asks of the generator. It shares [`Assets`] with the renderer and keeps
+/// What the engine asks of the tool. It shares [`Assets`] with the renderer and keeps
 /// what the skin logs, for `--verbose`.
 pub struct Host {
     pub assets: Rc<RefCell<Assets>>,

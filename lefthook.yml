@@ -1,0 +1,26 @@
+# Git hooks. One-time setup after cloning: `lefthook install`
+# (https://lefthook.dev: `brew install lefthook`, `winget install evilmartians.lefthook`, ...)
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.rs"
+      run: cargo fmt --all -- --check
+    lint:
+      glob: "*.{rs,toml}"
+      run: cargo clippy --all-targets --locked -- -D warnings
+
+commit-msg:
+  commands:
+    conventional:
+      run: bash scripts/check-commit-message.sh {1}
+
+pre-push:
+  commands:
+    format:
+      run: cargo fmt --all -- --check
+    lint:
+      run: cargo clippy --all-targets --locked -- -D warnings
+    test:
+      run: cargo test --locked

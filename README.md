@@ -30,6 +30,11 @@ From a checkout, `cargo build --release` leaves the binary at
 
 The binary is self-contained. The fonts it needs are built in.
 
+> [!IMPORTANT]
+> For images that match Winamp on Windows letter for letter, pass the real Arial with
+> `--fonts`. The built-in fonts are free stand-ins: text comes out as crisp as Winamp's, but
+> the letters are shaped a little differently. See [Fonts](#fonts).
+
 ## Use
 
 ### One skin
@@ -301,9 +306,16 @@ Text is drawn the way Windows draws it for Winamp:
 - The font's `gasp` table says at which sizes letters are smoothed. Arial from 9 to 17
   pixels, which covers the playlist, is not smoothed at all.
 
+### A Winamp reference needs Arial
+
 Liberation Sans has Arial's widths but not its letter shapes, and DejaVu Sans Condensed
-only resembles Tahoma. To draw with the real fonts, pass a folder that holds them under the names Windows gives them
-(`arial.ttf`, `arialbd.ttf`, `tahoma.ttf`, `tahomabd.ttf`; any of the four):
+only resembles Tahoma. An image drawn with the stand-ins is therefore a good preview, not
+a reference for what Winamp shows on Windows: on the playlist of the default state about
+550 pixels differ from Winamp's. With Arial itself those rows are identical.
+
+So for a reference, pass a folder that holds the real fonts under the names Windows gives
+them (`arial.ttf`, `arialbd.ttf`, `tahoma.ttf`, `tahomabd.ttf`; any of the four). The
+classic playlist needs only `arial.ttf`:
 
 ```
 walkit render skin.wsz --fonts /path/to/fonts

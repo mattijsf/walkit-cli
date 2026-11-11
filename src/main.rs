@@ -69,7 +69,8 @@ struct Render {
     #[arg(long, value_name = "ZIP")]
     wasabi: Option<String>,
     /// A folder of TrueType fonts to draw with in place of the built-in stand-ins: arial.ttf,
-    /// arialbd.ttf, tahoma.ttf and tahomabd.ttf, as Windows names them.
+    /// arialbd.ttf, tahoma.ttf and tahomabd.ttf, as Windows names them. Text matches Winamp
+    /// on Windows exactly only with the real Arial.
     #[arg(long, value_name = "DIR")]
     fonts: Option<PathBuf>,
     /// How many skins render at once.

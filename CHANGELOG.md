@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/mattijsf/walkit-cli/compare/v0.1.1...v0.1.2) (2026-11-12)
+
+
+### Features
+
+* install with cargo install walkit-cli ([#7](https://github.com/mattijsf/walkit-cli/issues/7)) ([f134e77](https://github.com/mattijsf/walkit-cli/commit/f134e77c1e71052ff657ecc4733d5a0b93b355f0))
+
 ## [0.1.1](https://github.com/mattijsf/walkit-cli/compare/v0.1.0...v0.1.1) (2026-11-12)
 
 

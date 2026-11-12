@@ -25,6 +25,13 @@ Download a binary for Linux, macOS or Windows from the
 cargo install --git https://github.com/mattijsf/walkit-cli
 ```
 
+Once the crate is on [crates.io](https://crates.io/crates/walkit-cli) (coming with a later
+release), this will do:
+
+```
+cargo install walkit-cli
+```
+
 From a checkout, `cargo build --release` leaves the binary at
 `target/release/walkit`.
 

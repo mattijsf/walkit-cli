@@ -5,17 +5,32 @@ version = "0.1.1"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/mattijsf/walkit-cli"
+# crates.io: the release workflow's publish job skips while this says false. To publish,
+# drop this line and swap the git dependency on `walkit` below for the engine's
+# crates.io release (see CONTRIBUTING.md, "Releases").
 publish = false
 readme = "README.md"
 keywords = ["winamp", "skin", "screenshot", "wsz", "wal"]
 categories = ["command-line-utilities", "multimedia::images"]
+# What goes into the crate: the sources, the fonts the binary embeds (with their licenses),
+# the museum parameters, the tests and their two original skins, and the docs.
+include = [
+    "/src",
+    "/fonts",
+    "/params/museum.json",
+    "/tests",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE",
+]
 
 [[bin]]
 name = "walkit"
 path = "src/main.rs"
 
 [dependencies]
-# the engine, with its TrueType letters drawn as Winamp draws them
+# the engine, with its TrueType letters drawn as Winamp draws them; once it is on crates.io:
+# walkit = { version = "0.10", features = ["truetype"] }
 walkit = { git = "https://github.com/mattijsf/walkit", rev = "207d8d828c06f7e13d6b20b7b45f2f639a4eeac7", features = ["truetype"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "bmp", "gif", "jpeg"] }
 zip = { version = "2.6.1", default-features = false, features = ["deflate"] }

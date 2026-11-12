@@ -721,9 +721,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "walkit"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21ff1287fa310b373b7d9e4bc868404aaeabd2240d22143e1f8d35757d70187a"
+checksum = "f8850fc9b960c21700c21a43dafd527ead89a08c85416aa4fbe2276572c1a3ed"
 dependencies = [
  "skrifa",
 ]

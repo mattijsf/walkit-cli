@@ -13,6 +13,7 @@ use md5::{Digest, Md5};
 use walkit::files::MemoryFiles;
 
 use walkit_cli::compare::compare;
+use walkit_cli::info;
 use walkit_cli::input::{self, Source};
 use walkit_cli::output;
 use walkit_cli::params::Params;
@@ -36,6 +37,28 @@ enum Command {
     Params,
     /// Compare two images pixel by pixel.
     Compare(Compare),
+    /// Print what is known about skins: who made them, what is in them, and what the
+    /// engine makes of them.
+    Info(Info),
+}
+
+#[derive(clap::Args)]
+struct Info {
+    /// Skins: .wsz or .wal files, http(s) addresses, or folders of skins.
+    #[arg(required = true)]
+    inputs: Vec<String>,
+    /// Also search the folders under a folder.
+    #[arg(short, long)]
+    recursive: bool,
+    /// Print JSON: an object for one skin, an array for more.
+    #[arg(long)]
+    json: bool,
+    /// A classic skin (file or address) laid under every classic skin.
+    #[arg(long, value_name = "SKIN")]
+    base: Option<String>,
+    /// A zip of Winamp's wasabi folder (file or address) laid under every modern skin.
+    #[arg(long, value_name = "ZIP")]
+    wasabi: Option<String>,
 }
 
 #[derive(clap::Args)]
@@ -123,6 +146,13 @@ fn main() -> ExitCode {
             Ok(true)
         }
         Command::Compare(args) => run_compare(args),
+        // skins nest deep: the engine recurses through their groups
+        Command::Info(args) => std::thread::Builder::new()
+            .stack_size(64 * 1024 * 1024)
+            .spawn(move || run_info(args))
+            .expect("a thread")
+            .join()
+            .unwrap_or_else(|_| Err("the engine stopped".into())),
     };
     match result {
         Ok(true) => ExitCode::SUCCESS,
@@ -186,19 +216,8 @@ fn render(args: Render) -> Result<bool, String> {
     if args.output.is_some() && sources.len() != 1 {
         return Err("--output takes a single skin; use --out-dir for more".into());
     }
-    let under = |what: &str, source: &Option<String>| -> Result<Option<Vec<u8>>, String> {
-        let Some(source) = source else {
-            return Ok(None);
-        };
-        let bytes = Source::parse(source)
-            .read()
-            .map_err(|e| format!("{what} {source}: {e}"))?;
-        // a base that does not unzip fails here, once, rather than under every skin
-        skin::unzip(&bytes).map_err(|e| format!("{what} {source}: {e}"))?;
-        Ok(Some(bytes))
-    };
-    let base = under("--base", &args.base)?;
-    let wasabi = under("--wasabi", &args.wasabi)?;
+    let base = under_skin("--base", &args.base)?;
+    let wasabi = under_skin("--wasabi", &args.wasabi)?;
     let fonts = match &args.fonts {
         Some(dir) => read_fonts(dir)?,
         None => Vec::new(),
@@ -262,6 +281,70 @@ fn render(args: Render) -> Result<bool, String> {
         println!("{} rendered, {failed} failed", count - failed);
     }
     Ok(failed == 0)
+}
+
+/// The bytes of a skin or zip laid under others, checked to unzip; `None` without one.
+fn under_skin(what: &str, source: &Option<String>) -> Result<Option<Vec<u8>>, String> {
+    let Some(source) = source else {
+        return Ok(None);
+    };
+    let bytes = Source::parse(source)
+        .read()
+        .map_err(|e| format!("{what} {source}: {e}"))?;
+    // a base that does not unzip fails here, once, rather than under every skin
+    skin::unzip(&bytes).map_err(|e| format!("{what} {source}: {e}"))?;
+    Ok(Some(bytes))
+}
+
+/// Prints what is known about the skins; `Ok(false)` when any could not be read.
+fn run_info(args: Info) -> Result<bool, String> {
+    let sources = input::expand(&args.inputs, args.recursive)?;
+    if sources.is_empty() {
+        return Err("no skins".into());
+    }
+    let unzip = |what: &str, source: &Option<String>| -> Result<Option<MemoryFiles>, String> {
+        Ok(under_skin(what, source)?.and_then(|b| skin::unzip(&b).ok()))
+    };
+    let base = unzip("--base", &args.base)?;
+    let wasabi = unzip("--wasabi", &args.wasabi)?;
+    let params = Params::default();
+    std::panic::set_hook(Box::new(|_| {}));
+    let mut infos = Vec::new();
+    let mut ok = true;
+    for source in &sources {
+        let result = source.read().and_then(|bytes| {
+            let skin = Skin::open(&bytes, base.as_ref(), wasabi.as_ref())?;
+            catch_unwind(AssertUnwindSafe(|| {
+                info::inspect(&skin, &bytes, &source.name(), &params)
+            }))
+            .map_err(|_| "the engine stopped".to_string())
+        });
+        match result {
+            Ok(info) if args.json => infos.push(info),
+            Ok(info) => {
+                if !infos.is_empty() || !ok {
+                    println!();
+                }
+                println!("{source}\n{}", info.to_text());
+                infos.push(info);
+            }
+            Err(message) => {
+                ok = false;
+                eprintln!("failed: {source}: {message}");
+            }
+        }
+    }
+    if args.json {
+        let json = if sources.len() == 1 {
+            infos.first().map(serde_json::to_string_pretty)
+        } else {
+            Some(serde_json::to_string_pretty(&infos))
+        };
+        if let Some(json) = json {
+            println!("{}", json.map_err(|e| e.to_string())?);
+        }
+    }
+    Ok(ok)
 }
 
 /// A skin's name as a file name: what a file system refuses is replaced.

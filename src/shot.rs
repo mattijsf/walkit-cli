@@ -9,7 +9,7 @@ use std::rc::Rc;
 use walkit::classic::style::ClassicStyle;
 use walkit::classic::vis::{VisMode, VisStyle};
 use walkit::draw::{DrawCmd, Rect};
-use walkit::host::{Clock, SkinSetup};
+use walkit::host::{Clock, SkinSetup, UnknownObject, WindowInfo};
 use walkit::SkinRuntime;
 
 use crate::host::{Assets, Host};
@@ -33,8 +33,16 @@ pub struct Shot {
     pub log: Vec<String>,
 }
 
-/// Renders `skin`, which scripts know as `name`, in the state `params` describe.
-pub fn shoot(skin: &Skin, name: &str, params: &Params) -> Result<Shot, String> {
+/// A skin loaded into the engine and staged in the state the parameters name.
+struct Staged {
+    runtime: SkinRuntime,
+    assets: Rc<RefCell<Assets>>,
+    log: Rc<RefCell<Vec<String>>>,
+    windows: Windows,
+}
+
+/// Loads `skin`, which scripts know as `name`, and stages the state `params` describe.
+fn stage(skin: &Skin, name: &str, params: &Params) -> Staged {
     let assets = Rc::new(RefCell::new(Assets::new(skin.files())));
     let log = Rc::new(RefCell::new(Vec::new()));
     let host = Host {
@@ -61,6 +69,53 @@ pub fn shoot(skin: &Skin, name: &str, params: &Params) -> Result<Shot, String> {
         Kind::Classic => stage_classic(&mut runtime, params),
         Kind::Modern => stage_modern(&mut runtime, params, &now),
     };
+    Staged {
+        runtime,
+        assets,
+        log,
+        windows,
+    }
+}
+
+/// What the engine makes of a skin once it is loaded and staged as for a picture.
+pub struct Survey {
+    /// The windows on screen, the main one first.
+    pub windows: Vec<WindowInfo>,
+    /// The skin's colour themes, in its order.
+    pub color_themes: Vec<String>,
+    /// The objects in the windows on screen that stand in for tags nothing defines.
+    pub unknown: Vec<UnknownObject>,
+    /// What the skin logged while it loaded and ran.
+    pub log: Vec<String>,
+}
+
+/// Loads `skin` as [`shoot`] does and reports what the engine made of it.
+pub fn survey(skin: &Skin, name: &str, params: &Params) -> Survey {
+    let Staged {
+        mut runtime, log, ..
+    } = stage(skin, name, params);
+    let windows = runtime
+        .window_ids()
+        .into_iter()
+        .map(|id| runtime.window_info(id))
+        .collect();
+    let log = log.borrow().clone();
+    Survey {
+        windows,
+        color_themes: runtime.color_themes(),
+        unknown: runtime.unknown_objects(),
+        log,
+    }
+}
+
+/// Renders `skin`, which scripts know as `name`, in the state `params` describe.
+pub fn shoot(skin: &Skin, name: &str, params: &Params) -> Result<Shot, String> {
+    let Staged {
+        assets,
+        log,
+        windows,
+        ..
+    } = stage(skin, name, params);
     let (width, height, windows) = match skin.kind {
         Kind::Classic => frame(windows, params.classic.width, params.classic.height, false),
         Kind::Modern => frame(windows, None, None, true),

@@ -351,3 +351,66 @@ fn a_flat_picture_names_the_wasabi_parts_the_skin_lacks() {
         text(&result.stderr)
     );
 }
+
+#[test]
+fn info_tells_what_a_modern_skin_says_of_itself() {
+    let result = run(&["info", MODERN]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let out = text(&result.stdout);
+    for line in [
+        "kind          modern",
+        "title         walkit modern",
+        "author        walkit",
+        "containers    main \"Main Window\", pledit \"Playlist Editor\"",
+        "windows       main/normal 300x112",
+    ] {
+        assert!(out.contains(line), "{line} in\n{out}");
+    }
+    assert!(!out.contains("missing parts"), "{out}");
+}
+
+#[test]
+fn info_reads_a_classic_skins_settings() {
+    let result = run(&["info", "--json", CLASSIC]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let info: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(info["kind"], "classic");
+    let classic = &info["classic"];
+    assert_eq!(classic["missing_sheets"], serde_json::json!([]));
+    assert_eq!(classic["playlist"]["font"], "Arial");
+    assert_eq!(classic["vis_colors"].as_array().unwrap().len(), 24);
+}
+
+#[test]
+fn info_names_the_parts_a_window_lacks() {
+    let dir = Scratch::new("info-wasabi");
+    let skin = dir.path("frame.wal");
+    let mut out = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    out.start_file("skin.xml", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    out.write_all(
+        br#"<WasabiXML><skininfo><name>Frame</name><author>Someone</author></skininfo>
+        <container id="main" default_visible="1"><layout id="normal" w="100" h="40">
+        <Wasabi:StandardFrame:Status x="0" y="0" w="0" h="0" relatw="1" relath="1"/>
+        </layout></container></WasabiXML>"#,
+    )
+    .unwrap();
+    out.start_file("readme.txt", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    out.write_all(b"Made by someone.\r\nEnjoy.").unwrap();
+    out.finish().unwrap();
+    let result = run(&["info", "--json", skin.to_str().unwrap(), MODERN]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let infos: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let frame = &infos[0];
+    assert_eq!(frame["modern"]["skin_info"]["author"], "Someone");
+    assert_eq!(
+        frame["modern"]["missing_parts"],
+        serde_json::json!([{"tag": "wasabi:standardframe:status", "container": "main"}])
+    );
+    assert_eq!(
+        frame["texts"],
+        serde_json::json!([{"file": "readme.txt", "text": "Made by someone.\nEnjoy."}])
+    );
+    assert_eq!(infos[1]["name"], "walkit-modern");
+}

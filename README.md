@@ -128,6 +128,27 @@ one classic window), and can write a picture of where the two differ. `--min-sam
 it fail under a threshold. `scripts/compare-with-museum.sh <md5>...` renders skins from the
 museum and measures each against the museum's screenshot.
 
+### Skin info
+
+```
+walkit info Bento.wal
+walkit info --json skins/ > skins.json
+```
+
+prints what is known about a skin: its md5 and files, the author's readme and other text
+files, and by kind:
+
+- a classic skin: the bitmaps it lacks and the optional ones it has, the playlist's colours
+  and font from `pledit.txt`, the 24 vis colours, the windows `region.txt` shapes, and its
+  cursors.
+- a modern skin: what `<skininfo>` says (title, version, author, comment, email, homepage),
+  the format version, its containers, the windows that open once it has loaded and their
+  sizes, its colour themes, scripts and fonts, the parts of drawn windows nothing defines
+  (such as `wasabi:standardframe:status` without `--wasabi`), and the plugin it is made for.
+
+`--json` prints an object for one skin and an array for more. `--base` and `--wasabi` lay the
+same files under the skins as for `render`.
+
 ## The parameter file
 
 `--params file.json` sets what the preview shows. Every field is optional: a file names only

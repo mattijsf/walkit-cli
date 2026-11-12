@@ -5,6 +5,7 @@
 
 pub mod compare;
 pub mod host;
+pub mod info;
 pub mod input;
 pub mod output;
 pub mod params;

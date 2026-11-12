@@ -33,7 +33,7 @@ const FONTS: [(&str, &[u8]); 4] = [
 
 /// The bitmaps Winamp draws a classic skin's three windows from. `nums_ex.bmp` and
 /// `balance.bmp` are left out: `numbers.bmp` and `volume.bmp` stand in for them.
-const CLASSIC_SHEETS: [&str; 12] = [
+pub(crate) const CLASSIC_SHEETS: [&str; 12] = [
     "main.bmp",
     "cbuttons.bmp",
     "titlebar.bmp",
@@ -279,8 +279,20 @@ impl Skin {
         plugins
     }
 
+    /// The paths of the files in the skin's own archive, sorted.
+    pub fn names(&self) -> Vec<String> {
+        let mut names = self.archive.names();
+        names.sort();
+        names
+    }
+
+    /// A file of the skin's own archive, its path matched as the engine matches it.
+    pub fn read(&self, path: &str) -> Option<Rc<[u8]>> {
+        self.archive.read(path)
+    }
+
     /// The text of the skin's own XML files.
-    fn xml_files(&self) -> Vec<String> {
+    pub(crate) fn xml_files(&self) -> Vec<String> {
         self.archive
             .names()
             .into_iter()

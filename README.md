@@ -246,15 +246,15 @@ under them, compared pixel by pixel with the museum's screenshot of the same ski
 
 | Skin | Identical pixels | Outside the playlist's text rows |
 | --- | --- | --- |
-| base-2.91 | 94.68% | 98.14% |
-| Winamp3_Classified_v5.5 | 94.66% | 98.11% |
-| Winamp5_Classified_v5.5 | 94.23% | 97.58% |
-| Bento_Classified | 94.56% | 97.97% |
-| Garfield | 94.37% | 97.77% |
-| Zelda_Amp_3 | 94.94% | 98.44% |
-| Deus_Ex_Amp_by_AJ | 95.52% | 99.08% |
-| the_Cube_v2_by_Kuki | 94.10% | 98.42% |
-| Microchip_2 | 94.38% | 98.09% |
+| base-2.91 | 94.65% | 98.10% |
+| Winamp3_Classified_v5.5 | 94.63% | 98.07% |
+| Winamp5_Classified_v5.5 | 94.19% | 97.53% |
+| Bento_Classified | 94.56% | 97.96% |
+| Garfield | 94.33% | 97.73% |
+| Zelda_Amp_3 | 94.91% | 98.39% |
+| Deus_Ex_Amp_by_AJ | 95.48% | 99.04% |
+| the_Cube_v2_by_Kuki | 94.08% | 98.37% |
+| Microchip_2 | 94.34% | 98.04% |
 
 To the eye the images are the same picture. Where they differ, the same state was set up in
 Winamp 5.666 in a virtual machine (the same skin, tracks, position, volume, equalizer and
@@ -284,9 +284,8 @@ difference below is one where the tool follows Winamp instead of the museum's im
    Winamp does. On Microchip_2 the museum's image leaves 689 pixels opaque that Winamp
    cuts away; the tool's shape matched Winamp's exactly.
 6. **The equalizer's curve.** The line in the equalizer's graph differs from the museum's
-   in about 60 pixels. Here neither image matches Winamp: walkit's curve differs from
-   Winamp's in 108 pixels for these slider values, the museum's in 90. This is a known gap
-   in the engine, not a choice.
+   in about 90 pixels. The tool draws the curve as Winamp does; the museum's differs from
+   Winamp's in 90 pixels for these slider values.
 
 The title in the main window does not scroll in either image, the visualizer window stays
 closed, and the main window has the focus.
@@ -298,13 +297,20 @@ stand-ins that are compiled into the binary: Liberation Sans for Arial (SIL Open
 License) and DejaVu Sans Condensed for Tahoma (Bitstream Vera license). The font files and
 their licenses are in [`fonts/`](fonts). A skin's own TrueType fonts are read from the skin.
 
-Text is drawn the way Windows draws it for Winamp:
+Text is drawn by the walkit engine's own TrueType drawing (its `truetype` feature), as
+Winamp draws it. A classic skin's text is drawn the way Windows draws it:
 
 - The font's own hinting fits each letter to the pixel grid.
 - Letters advance by whole pixels, with the widths the font's device tables give and the
-  kerning of its `kern` table.
+  kerning of its `kern` table. A font whose `GPOS` table leaves kerning out of Latin text
+  is not kerned, as Windows does not kern it: Tahoma is not, Arial is.
 - The font's `gasp` table says at which sizes letters are smoothed. Arial from 9 to 17
-  pixels, which covers the playlist, is not smoothed at all.
+  pixels, which covers the playlist, is not smoothed at all. Smoothed letters blend with
+  Windows' gamma.
+
+A modern skin's text is always smoothed, as Winamp draws it, fitted to the pixel grid by
+an autohinter at three quarters of the skin's font size, unless the skin sets
+`antialias="0"`.
 
 ### A Winamp reference needs Arial
 
@@ -324,10 +330,13 @@ walkit render skin.wsz --fonts /path/to/fonts
 On Windows they are in `C:\Windows\Fonts`. They are Microsoft's and are not part of this
 repository.
 
-Checked against Winamp 5.666 in a virtual machine, with Arial at the playlist's size: a
-playlist of twelve test lines (both alphabets, digits, punctuation, pangrams) differed in 5
-pixels, all at the foot of a `V` or `v`. Smoothed sizes and Tahoma have not been compared
-with Winamp.
+Checked against Winamp 5.666 in a virtual machine, with the real fonts: a classic playlist
+of twelve test lines (both alphabets, digits, punctuation, pangrams) at playlist font sizes
+10 to 24, in Arial and in Tahoma. Rows sit at the same height at every size. At size 10,
+Arial differs in 2 pixels (the `@`), Tahoma in 11. Up to size 16 no size differs in more
+than 150 pixels. From size 17 (Tahoma) and 18 (Arial), where letters are smoothed, they sit
+where Winamp puts them but their shades differ, in about 7,000 to 9,000 pixels of the
+playlist. Modern skins' letters land where Winamp puts them; their shades differ a little.
 
 ## Development
 

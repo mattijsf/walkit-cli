@@ -15,7 +15,8 @@ name = "walkit"
 path = "src/main.rs"
 
 [dependencies]
-walkit = { git = "https://github.com/mattijsf/walkit", tag = "v0.9.0" }
+# the engine, with its TrueType letters drawn as Winamp draws them
+walkit = { git = "https://github.com/mattijsf/walkit", rev = "207d8d828c06f7e13d6b20b7b45f2f639a4eeac7", features = ["truetype"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "bmp", "gif", "jpeg"] }
 zip = { version = "2.6.1", default-features = false, features = ["deflate"] }
 serde = { version = "1", features = ["derive"] }
@@ -23,7 +24,6 @@ serde_json = "1"
 clap = { version = "4", features = ["derive"] }
 ureq = "3"
 md-5 = "0.10"
-skrifa = "0.50.0"
 
 [profile.release]
 opt-level = 3

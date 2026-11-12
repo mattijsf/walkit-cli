@@ -6,7 +6,9 @@
 
 use walkit::draw::{DrawCmd, Gamma, Rect, Region, TextCmd};
 
-use crate::host::{pixels, Assets};
+use walkit::truetype::{em, Style};
+
+use crate::host::Assets;
 
 /// The image being drawn: `w` x `h` device pixels, rows top first, each `0xAARRGGBB` with
 /// the color not multiplied by the alpha.
@@ -149,6 +151,36 @@ impl Pen {
 
     /// Blends `argb` over the canvas at `x`, `y` with `alpha` 0..255 on top of its own alpha,
     /// when the pixel lies in the clip and in the window's shape.
+    /// Blends one pixel of a letter, `cover` of 255 dark, in `color`. A letter drawn with a
+    /// gamma (smoothed classic text, as Windows blends it) mixes with that gamma over an
+    /// opaque pixel; any other is laid on like a picture's pixel.
+    #[allow(clippy::too_many_arguments)]
+    fn blend_letter(
+        &self,
+        canvas: &mut Canvas,
+        x: i32,
+        y: i32,
+        color: u32,
+        cover: u8,
+        gamma: f32,
+        alpha: i32,
+    ) {
+        let i = (y * canvas.w + x) as usize;
+        let opaque = canvas.pixels.get(i).is_some_and(|p| (p >> 24) == 0xff);
+        if gamma == 1.0 || !opaque {
+            let argb = (u32::from(cover) << 24) | (color & 0x00ff_ffff);
+            self.blend(canvas, x, y, argb, alpha);
+            return;
+        }
+        if !self.clip().contains(x, y) || self.mask.as_ref().is_some_and(|m| !m.get(x, y)) {
+            return;
+        }
+        let a = (u32::from(cover) * alpha.clamp(0, 255) as u32 / 255) as u8;
+        let under = canvas.pixels[i];
+        let mixed = walkit::truetype::blend(color & 0x00ff_ffff, under & 0x00ff_ffff, a, gamma);
+        canvas.pixels[i] = 0xff00_0000 | mixed;
+    }
+
     fn blend(&self, canvas: &mut Canvas, x: i32, y: i32, argb: u32, alpha: i32) {
         if !self.clip().contains(x, y) || self.mask.as_ref().is_some_and(|m| !m.get(x, y)) {
             return;
@@ -296,11 +328,17 @@ fn stretch(
 /// Draws a run of text where the engine placed it: from `x` along the `baseline`, clipped to
 /// its box. The shadow goes first, under the letters.
 fn draw_text(canvas: &mut Canvas, assets: &mut Assets, pen: &mut Pen, text: &TextCmd) {
-    let Some(face) = assets.face(text.font.as_ref(), text.bold) else {
+    // smoothed text as Winamp draws a modern skin's, the rest as Windows draws it
+    let style = if text.smooth {
+        Style::Modern
+    } else {
+        Style::Classic
+    };
+    let Some(face) = assets.face(text.font.as_ref(), text.bold, style) else {
         return;
     };
     let s = pen.scale;
-    let px = pixels(text.size) * s as u32;
+    let px = em(style, text.size) * s as f32;
     // Windows places text on whole pixels
     let left = ((pen.origin.0 as f32 + text.x) * s as f32).round() as i32;
     let baseline = ((pen.origin.1 as f32 + text.baseline) * s as f32).round() as i32;
@@ -316,27 +354,22 @@ fn draw_text(canvas: &mut Canvas, assets: &mut Assets, pen: &mut Pen, text: &Tex
     runs.push((left, baseline, text.color.0));
     // a font without a bold cut is drawn twice, a pixel apart
     let strokes: &[i32] = if face.fake_bold { &[0, s] } else { &[0] };
+    let letters = face
+        .font
+        .run(&text.text, style, px, if face.fake_bold { s } else { 0 });
     for (x0, y0, color) in runs {
         for &dx in strokes {
-            let mut x = x0 + dx;
-            let mut last = None;
-            for c in text.text.chars() {
-                if let Some(prev) = last {
-                    x += face.font.kerning(prev, c, px);
-                }
-                last = Some(c);
-                let glyph = face.font.glyph(c, px);
-                let (gx, gy) = (x + glyph.left, y0 - glyph.top);
+            for (at, glyph) in &letters {
+                let (gx, gy) = (x0 + dx + at + glyph.left, y0 - glyph.top);
                 for row in 0..glyph.h {
                     for col in 0..glyph.w {
-                        let cover = u32::from(glyph.coverage[row * glyph.w + col]);
+                        let cover = glyph.coverage[row * glyph.w + col];
                         if cover > 0 {
-                            let argb = (cover << 24) | (color & 0x00ff_ffff);
-                            pen.blend(canvas, gx + col as i32, gy + row as i32, argb, text.alpha);
+                            let (x, y) = (gx + col as i32, gy + row as i32);
+                            pen.blend_letter(canvas, x, y, color, cover, glyph.gamma, text.alpha);
                         }
                     }
                 }
-                x += glyph.advance;
             }
         }
     }

@@ -5,9 +5,6 @@ version = "0.1.1"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/mattijsf/walkit-cli"
-# crates.io: the release workflow's publish job skips while this says false. Drop this line
-# to publish (see CONTRIBUTING.md, "Releases").
-publish = false
 readme = "README.md"
 keywords = ["winamp", "skin", "screenshot", "wsz", "wal"]
 categories = ["command-line-utilities", "multimedia::images"]

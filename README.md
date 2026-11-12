@@ -18,19 +18,16 @@ walkit render Zelda_Amp_3.wsz
 ## Install
 
 Download a binary for Linux, macOS or Windows from the
-[releases](https://github.com/mattijsf/walkit-cli/releases), or build it with a stable
-[Rust](https://rustup.rs) toolchain:
-
-```
-cargo install --git https://github.com/mattijsf/walkit-cli
-```
-
-Once the crate is on [crates.io](https://crates.io/crates/walkit-cli) (coming with a later
-release), this will do:
+[releases](https://github.com/mattijsf/walkit-cli/releases), or install it from
+[crates.io](https://crates.io/crates/walkit-cli) with a stable [Rust](https://rustup.rs)
+toolchain:
 
 ```
 cargo install walkit-cli
 ```
+
+The latest commit on `main` installs with
+`cargo install --git https://github.com/mattijsf/walkit-cli`.
 
 From a checkout, `cargo build --release` leaves the binary at
 `target/release/walkit`.

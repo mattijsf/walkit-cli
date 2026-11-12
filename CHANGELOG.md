@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/mattijsf/walkit-cli/compare/v0.1.2...v0.1.3) (2026-11-12)
+
+
+### Features
+
+* say why a modern skin comes out flat or shows no window ([#10](https://github.com/mattijsf/walkit-cli/issues/10)) ([7001431](https://github.com/mattijsf/walkit-cli/commit/7001431a54b1ce5a9f2eb93c1e5f04420aeacd79))
+
 ## [0.1.2](https://github.com/mattijsf/walkit-cli/compare/v0.1.1...v0.1.2) (2026-11-12)
 
 

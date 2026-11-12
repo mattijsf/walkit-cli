@@ -96,8 +96,7 @@ binaries on each platform and attaches them, each with a SHA-256 checksum:
 Once every target has built, the release workflow publishes the crate to
 [crates.io](https://crates.io/crates/walkit-cli) with `cargo publish --locked`. It needs a
 crates.io API token with the publish-new and publish-update scopes in the repository secret
-`CARGO_REGISTRY_TOKEN`. The job skips while `Cargo.toml` says `publish = false`, which stays
-until the engine is on crates.io and `walkit` is a versioned dependency instead of a git one.
+`CARGO_REGISTRY_TOKEN`. The job skips while `Cargo.toml` says `publish = false`.
 
 For release-please to open its pull request, the repository setting "Allow GitHub Actions to
 create and approve pull requests" (Settings, Actions, General) has to be on.

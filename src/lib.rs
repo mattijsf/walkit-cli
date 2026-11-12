@@ -12,4 +12,3 @@ pub mod player;
 pub mod render;
 pub mod shot;
 pub mod skin;
-pub mod text;

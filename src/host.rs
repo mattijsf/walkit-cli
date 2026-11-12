@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! The host: the skin's pictures, decoded with the `image` crate, and its text, measured and
-//! drawn by [`crate::text`]. The engine reads them through [`Host`]; the renderer reads the same
+//! drawn by the engine's [`walkit::truetype`] as Winamp draws it: a classic skin's text as
+//! Windows draws it, a modern skin's smoothed text as Winamp draws that. The engine reads them
+//! through [`Host`]; the renderer reads the same
 //! [`Assets`], so each picture and font is decoded once. The free fonts that stand in for
 //! Arial and Tahoma lie under the skin's files as `fonts/LiberationSans.ttf` and the like.
 
@@ -11,10 +13,9 @@ use std::rc::Rc;
 
 use walkit::draw::FontDef;
 use walkit::files::SkinFiles;
-use walkit::gdi::{em_size, FontFace};
+use walkit::gdi::FontFace;
 use walkit::host::SkinHost;
-
-use crate::text::Font;
+use walkit::truetype::{em, Font, Style};
 
 /// The font for text that names none, and the one a missing font falls back to: the stand-in
 /// for Arial, read from under the skin's files.
@@ -74,9 +75,17 @@ impl Assets {
         decoded
     }
 
-    /// The font `font` draws in, `bold` or not, as the engine names its face; `None` only
-    /// when not even the default font loads.
-    pub fn face(&mut self, font: Option<&FontDef>, bold: bool) -> Option<TextFace> {
+    /// The font `font` draws in, `bold` or not, in `style`, as the engine names its face;
+    /// `None` only when not even the default font loads.
+    pub fn face(&mut self, font: Option<&FontDef>, bold: bool, style: Style) -> Option<TextFace> {
+        // smoothed bold is the regular letters drawn twice, even where a bold cut exists
+        if style == Style::Modern && bold {
+            let face = self.face(font, false, style)?;
+            return Some(TextFace {
+                font: face.font,
+                fake_bold: true,
+            });
+        }
         let face = FontFace::of(font, bold);
         let (found, fake_bold) = match &face {
             // a Windows font the skin names without a file: the free font standing in for it
@@ -144,11 +153,6 @@ fn decode(bytes: &[u8]) -> Option<Picture> {
     })
 }
 
-/// The whole pixels per em Windows draws a skin's font size at.
-pub fn pixels(size: i32) -> u32 {
-    em_size(size).max(1.0) as u32
-}
-
 /// What the engine asks of the tool. It shares [`Assets`] with the renderer and keeps
 /// what the skin logs, for `--verbose`.
 pub struct Host {
@@ -157,18 +161,37 @@ pub struct Host {
 }
 
 impl Host {
-    /// How wide `text` draws in layout pixels: Winamp draws a font at three quarters of the
-    /// skin's size ([`em_size`]).
-    fn measure(&mut self, text: &str, font: Option<&FontDef>, size: i32, bold: bool) -> f32 {
-        let face = self.assets.borrow_mut().face(font, bold);
+    /// How wide `text` draws in layout pixels in `style`: Winamp draws a font at three
+    /// quarters of the skin's size ([`em`]).
+    fn measure(
+        &mut self,
+        text: &str,
+        font: Option<&FontDef>,
+        size: i32,
+        bold: bool,
+        style: Style,
+    ) -> f32 {
+        let face = self.assets.borrow_mut().face(font, bold, style);
         match face {
             Some(face) => {
                 // a font without a bold cut is drawn twice, a pixel apart
-                let bold = i32::from(face.fake_bold && !text.is_empty());
-                (face.font.advance(text, pixels(size)) + bold) as f32
+                let bold = i32::from(face.fake_bold);
+                face.font.width(text, style, em(style, size), bold) as f32
             }
             None => text.chars().count() as f32 * size as f32 * 0.6,
         }
+    }
+
+    /// The font's line in `style`.
+    fn line(
+        &mut self,
+        font: Option<&FontDef>,
+        size: i32,
+        bold: bool,
+        style: Style,
+    ) -> Option<(f32, f32)> {
+        let face = self.assets.borrow_mut().face(font, bold, style)?;
+        Some(face.font.line(style, em(style, size)))
     }
 }
 
@@ -194,11 +217,21 @@ impl SkinHost for Host {
     }
 
     fn text_width(&mut self, text: &str, font: Option<&FontDef>, size: i32, bold: bool) -> i32 {
-        self.measure(text, font, size, bold).ceil() as i32
+        self.measure(text, font, size, bold, Style::Classic).ceil() as i32
     }
 
     fn text_advance(&mut self, text: &str, font: Option<&FontDef>, size: i32, bold: bool) -> f32 {
-        self.measure(text, font, size, bold)
+        self.measure(text, font, size, bold, Style::Classic)
+    }
+
+    fn smooth_text_advance(
+        &mut self,
+        text: &str,
+        font: Option<&FontDef>,
+        size: i32,
+        bold: bool,
+    ) -> Option<f32> {
+        Some(self.measure(text, font, size, bold, Style::Modern))
     }
 
     fn line_metrics(
@@ -207,8 +240,16 @@ impl SkinHost for Host {
         size: i32,
         bold: bool,
     ) -> Option<(f32, f32)> {
-        let face = self.assets.borrow_mut().face(font, bold)?;
-        Some(face.font.line(pixels(size)))
+        self.line(font, size, bold, Style::Classic)
+    }
+
+    fn smooth_line_metrics(
+        &mut self,
+        font: Option<&FontDef>,
+        size: i32,
+        bold: bool,
+    ) -> Option<(f32, f32)> {
+        self.line(font, size, bold, Style::Modern)
     }
 
     fn font_file(&mut self, file: &str) -> Option<Rc<[u8]>> {

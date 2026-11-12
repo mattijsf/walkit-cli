@@ -91,6 +91,13 @@ walkit render skins/ -d previews/ \
 Some modern skins borrow frames, scrollbars and buttons from the wasabi folder that Winamp
 lays under every modern skin. Pass a zip of that folder with `--wasabi`. The walkit docs
 explain how to make it: [the wasabi base](https://mattijsf.github.io/walkit/wasabi-base/).
+Winamp 3's own default skin is one of them: without the folder its window comes out as one
+flat colour. When a picture is a single colour, or a skin draws nothing, the warning or
+failure names the wasabi parts the skin uses and does not define itself.
+
+Skins made for the classicPro plugin (most "cPro" skins) are colour themes: their windows
+are in the plugin's files in Winamp's `Plugins` folder, not in the skin. They fail with "the
+skin shows no window", and the message says which plugin they are made for.
 
 Both options take a file or an address. Neither file ships with this repository: they are
 Winamp's art.

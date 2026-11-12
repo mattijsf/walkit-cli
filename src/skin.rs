@@ -213,4 +213,80 @@ impl Skin {
             .filter(|sheet| !self.archive.exists(sheet))
             .collect()
     }
+
+    /// The parts of Winamp's wasabi folder a modern skin uses, such as
+    /// `wasabi:standardframe:status`, with no `--wasabi` under it to take them from: what
+    /// they draw is missing, often the whole window. A part the skin defines itself, with a
+    /// `xuitag` of a copy of the folder's files, is not missing. In lower case, sorted, each
+    /// once.
+    pub fn missing_wasabi_parts(&self) -> Vec<String> {
+        if self.kind != Kind::Modern || self.under.is_some() {
+            return Vec::new();
+        }
+        let name_at = |text: &str, at: usize| -> String {
+            text[at..]
+                .chars()
+                .take_while(|c| !c.is_whitespace() && !matches!(c, '/' | '>' | '"' | '\''))
+                .collect()
+        };
+        let mut used = Vec::new();
+        let mut defined = Vec::new();
+        for text in self.xml_files() {
+            let lower = text.to_ascii_lowercase();
+            for (at, _) in lower.match_indices("<wasabi:") {
+                used.push(name_at(&lower, at + 1));
+            }
+            for quote in ["xuitag=\"", "xuitag='"] {
+                for (at, _) in lower.match_indices(quote) {
+                    defined.push(name_at(&lower, at + quote.len()));
+                }
+            }
+        }
+        used.retain(|part| !defined.contains(part));
+        used.sort();
+        used.dedup();
+        used
+    }
+
+    /// The Winamp plugins a modern skin takes files from, by the folder its includes reach
+    /// into (`.../Plugins/classicPro/engine/load.xml` names `classicPro`). Such a skin is
+    /// made for the plugin: its windows are in the plugin's files, which no host has.
+    pub fn plugins(&self) -> Vec<String> {
+        if self.kind != Kind::Modern {
+            return Vec::new();
+        }
+        let mut plugins = Vec::new();
+        for text in self.xml_files() {
+            let lower = text.to_ascii_lowercase();
+            for (at, _) in lower.match_indices("<include") {
+                let tag = &text[at..];
+                let tag = &tag[..tag.find('>').unwrap_or(tag.len())];
+                let path = tag.replace('\\', "/");
+                let Some(start) = path.to_ascii_lowercase().find("/plugins/") else {
+                    continue;
+                };
+                let rest = &path[start + "/plugins/".len()..];
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| *c != '/' && *c != '"' && *c != '\'')
+                    .collect();
+                if !name.is_empty() && !plugins.contains(&name) {
+                    plugins.push(name);
+                }
+            }
+        }
+        plugins.sort();
+        plugins
+    }
+
+    /// The text of the skin's own XML files.
+    fn xml_files(&self) -> Vec<String> {
+        self.archive
+            .names()
+            .into_iter()
+            .filter(|name| name.to_lowercase().ends_with(".xml"))
+            .filter_map(|name| self.archive.read(&name))
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+            .collect()
+    }
 }

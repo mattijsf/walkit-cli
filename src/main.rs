@@ -371,7 +371,38 @@ fn render_one(
             missing.join(", ")
         ));
     }
-    let shot = shoot(&skin, &job.source.name(), &batch.params)?;
+    // a skin that draws nothing or one flat colour may lack what the wasabi folder or a
+    // plugin would give it: the reason goes with the failure or the warning
+    let mut reasons = Vec::new();
+    let parts = skin.missing_wasabi_parts();
+    if !parts.is_empty() {
+        let mut named = parts.iter().take(3).cloned().collect::<Vec<_>>().join(", ");
+        if parts.len() > 3 {
+            named.push_str(&format!(" and {} more", parts.len() - 3));
+        }
+        reasons.push(format!(
+            "the skin uses parts of Winamp's wasabi folder ({named}), which only --wasabi gives"
+        ));
+    }
+    let plugins = skin.plugins();
+    if !plugins.is_empty() {
+        reasons.push(format!(
+            "the skin is made for the {} plugin and takes its windows from the plugin's \
+             files, which are not in the skin",
+            plugins.join(" and ")
+        ));
+    }
+    let explain = |problem: String| {
+        std::iter::once(problem)
+            .chain(reasons.iter().cloned())
+            .collect::<Vec<_>>()
+            .join("; ")
+    };
+    let shot = shoot(&skin, &job.source.name(), &batch.params).map_err(explain)?;
+    let (pixels, _) = shot.rgba.as_chunks::<4>();
+    if pixels.iter().all(|p| p == &pixels[0]) {
+        warnings.push(explain("the picture is a single colour".into()));
+    }
     let path = match &job.path {
         Some(path) => path.clone(),
         None => batch.out_dir.join(format!("{:x}.png", Md5::digest(&bytes))),

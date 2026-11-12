@@ -45,11 +45,20 @@ fix: keep the batch going when a download times out
 ```
 
 `scripts/check-commit-message.sh` is the check the hook and CI use. CI applies it to every
-commit of a pull request and to the pull request's title, since the title becomes the commit
-on a squash merge.
+commit of a pull request and to the pull request's title, and runs again when the title is
+edited.
 
 The types matter: releases and the changelog are made from them. `feat` and `fix` show up in
-the changelog; `feat` raises the minor version and `fix` the patch version.
+the changelog. Before 1.0, both raise the patch version and a breaking change raises the
+minor version; from 1.0 on, `feat` raises the minor version and `fix` the patch version.
+
+## Merging
+
+`main` takes changes only through pull requests, and only once the checks pass: commit
+messages, formatting and lints, and the tests on Linux, macOS and Windows. Pull requests are
+squashed: each lands on `main` as one commit whose message is the pull request's title, so
+the title must follow the format above. The branch is deleted after the merge. `main` keeps a straight history and cannot be force-pushed
+or deleted.
 
 ## Parameters
 

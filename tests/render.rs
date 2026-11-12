@@ -206,3 +206,54 @@ fn the_png_decodes_to_the_same_pixels() {
     assert_eq!(decoded.dimensions(), (275, 348));
     assert!(decoded.into_raw() == shot.rgba);
 }
+
+/// A modern skin of one `skin.xml`.
+fn modern_skin(xml: &str) -> Vec<u8> {
+    let mut out = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    out.start_file("skin.xml", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    std::io::Write::write_all(&mut out, xml.as_bytes()).unwrap();
+    out.finish().unwrap().into_inner()
+}
+
+#[test]
+fn a_modern_skin_names_the_wasabi_parts_it_lacks() {
+    let bytes = modern_skin(
+        r#"<WasabiXML><container id="main"><layout id="normal">
+        <Wasabi:StandardFrame:Status id="frame"/><Wasabi:StandardFrame:NoStatus/>
+        <wasabi:standardframe:status x="2"/></layout></container></WasabiXML>"#,
+    );
+    let alone = Skin::open(&bytes, None, None).unwrap();
+    assert_eq!(
+        alone.missing_wasabi_parts(),
+        [
+            "wasabi:standardframe:nostatus",
+            "wasabi:standardframe:status"
+        ]
+    );
+    let wasabi = walkit::files::MemoryFiles::new();
+    let based = Skin::open(&bytes, None, Some(&wasabi)).unwrap();
+    assert!(based.missing_wasabi_parts().is_empty());
+    // the original skins draw everything themselves
+    assert!(Skin::open(MODERN, None, None)
+        .unwrap()
+        .missing_wasabi_parts()
+        .is_empty());
+    assert!(Skin::open(CLASSIC, None, None)
+        .unwrap()
+        .missing_wasabi_parts()
+        .is_empty());
+}
+
+#[test]
+fn a_modern_skin_names_the_plugins_it_is_made_for() {
+    let bytes = modern_skin(
+        r#"<WasabiXML><include file="colors.xml"/>
+        <include file="@COLORTHEMESPATH@/../../Plugins/classicPro/engine/load.xml" param="x"/>
+        <include file="@COLORTHEMESPATH@\..\..\Plugins\classicPro\engine\miniexes.xml"/>
+        </WasabiXML>"#,
+    );
+    let skin = Skin::open(&bytes, None, None).unwrap();
+    assert_eq!(skin.plugins(), ["classicPro"]);
+    assert!(Skin::open(MODERN, None, None).unwrap().plugins().is_empty());
+}

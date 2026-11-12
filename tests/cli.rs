@@ -282,3 +282,72 @@ fn a_skin_downloads_from_an_address() {
     assert!(result.status.success(), "{}", text(&result.stderr));
     assert_eq!(size(&out.join("Remote Skin.png")), (275, 348));
 }
+
+#[test]
+fn a_skin_made_for_a_plugin_says_so() {
+    let dir = Scratch::new("plugin");
+    let skin = dir.path("theme.wal");
+    let mut out = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    out.start_file("skin.xml", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    out.write_all(
+        br#"<WasabiXML><include file="@COLORTHEMESPATH@/../../Plugins/classicPro/engine/load.xml"/></WasabiXML>"#,
+    )
+    .unwrap();
+    out.finish().unwrap();
+    let result = run(&[
+        "render",
+        skin.to_str().unwrap(),
+        "-o",
+        dir.path("out.png").to_str().unwrap(),
+    ]);
+    assert!(!result.status.success());
+    let error = text(&result.stderr);
+    assert!(error.contains("the skin shows no window"), "{error}");
+    assert!(error.contains("made for the classicPro plugin"), "{error}");
+}
+
+#[test]
+fn a_flat_picture_names_the_wasabi_parts_the_skin_lacks() {
+    let dir = Scratch::new("wasabi");
+    let skin = dir.path("frame.wal");
+    let mut out = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    out.start_file("skin.xml", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    out.write_all(
+        br#"<WasabiXML><container id="main" default_visible="1"><layout id="normal" w="100" h="40">
+        <Wasabi:StandardFrame:Status x="0" y="0" w="0" h="0" relatw="1" relath="1"/>
+        </layout></container></WasabiXML>"#,
+    )
+    .unwrap();
+    out.finish().unwrap();
+    let result = run(&[
+        "render",
+        skin.to_str().unwrap(),
+        "-o",
+        dir.path("out.png").to_str().unwrap(),
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let warning = text(&result.stderr);
+    assert!(
+        warning.contains("the picture is a single colour"),
+        "{warning}"
+    );
+    assert!(
+        warning.contains("(wasabi:standardframe:status)"),
+        "{warning}"
+    );
+    // the original skin draws a real picture and needs no warning
+    let result = run(&[
+        "render",
+        MODERN,
+        "-o",
+        dir.path("ours.png").to_str().unwrap(),
+    ]);
+    assert!(result.status.success());
+    assert!(
+        !text(&result.stderr).contains("warning"),
+        "{}",
+        text(&result.stderr)
+    );
+}

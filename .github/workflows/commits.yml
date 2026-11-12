@@ -1,0 +1,37 @@
+name: Commits
+
+# A pull request lands on main as one squashed commit titled by the pull request, so the
+# title is checked as that commit's subject, with the " (#123)" GitHub adds to it. It runs
+# again when the title is edited; the commits on the branch are checked too.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+concurrency:
+  group: commits-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  commits:
+    name: Commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check the pull request's title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: bash scripts/check-commit-message.sh --subject "$TITLE (#$NUMBER)"
+      - name: Check every commit
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git log --format=%s "$BASE..$HEAD" | while IFS= read -r subject; do
+            bash scripts/check-commit-message.sh --subject "$subject"
+          done

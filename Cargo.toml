@@ -1,7 +1,7 @@
 [package]
 name = "walkit-cli"
 description = "Command-line tool for Winamp skins on the walkit engine: renders preview images and thumbnails"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/mattijsf/walkit-cli"

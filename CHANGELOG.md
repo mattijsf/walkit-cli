@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/mattijsf/walkit-cli/compare/v0.1.3...v0.1.4) (2026-11-13)
+
+
+### Features
+
+* walkit info prints what is known about a skin ([#12](https://github.com/mattijsf/walkit-cli/issues/12)) ([22cac62](https://github.com/mattijsf/walkit-cli/commit/22cac62713e5c69c6f518e2f4ee1e98341318a98))
+
 ## [0.1.3](https://github.com/mattijsf/walkit-cli/compare/v0.1.2...v0.1.3) (2026-11-12)
 
 

@@ -493,3 +493,57 @@ fn info_tells_where_in_the_archive_the_skin_is() {
     let out = text(&result.stdout);
     assert!(out.contains("other skins   Red/"), "{out}");
 }
+
+/// An archive of the original modern skin in each of `folders` ("" for the root).
+fn pack(path: &Path, folders: &[&str]) {
+    let modern = std::fs::read(MODERN).unwrap();
+    let mut from = zip::ZipArchive::new(std::io::Cursor::new(modern)).unwrap();
+    let mut out = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+    for folder in folders {
+        for i in 0..from.len() {
+            let entry = from.by_index(i).unwrap();
+            let name = format!("{folder}{}", entry.name());
+            out.raw_copy_file_rename(entry, name).unwrap();
+        }
+    }
+    out.finish().unwrap();
+}
+
+#[test]
+fn a_pack_of_skins_says_it_is_no_single_skin() {
+    let dir = Scratch::new("pack");
+    let skin = dir.path("pack.wal");
+    pack(&skin, &["Blue/", "Red/"]);
+    let result = run(&[
+        "render",
+        skin.to_str().unwrap(),
+        "-o",
+        dir.path("out.png").to_str().unwrap(),
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let warning = text(&result.stderr);
+    assert!(
+        warning.contains("not a single skin but a pack of 2 skins to unpack by hand; only \"Blue\" is read, without \"Red\""),
+        "{warning}"
+    );
+    // a skin at the root is the archive's skin, as Winamp reads it; a folder beside it is
+    // only more files
+    let skin = dir.path("root.wal");
+    pack(&skin, &["2003/", ""]);
+    let result = run(&[
+        "render",
+        skin.to_str().unwrap(),
+        "-o",
+        dir.path("root.png").to_str().unwrap(),
+    ]);
+    assert!(result.status.success());
+    assert!(
+        !text(&result.stderr).contains("warning"),
+        "{}",
+        text(&result.stderr)
+    );
+    let result = run(&["info", "--json", skin.to_str().unwrap()]);
+    let info: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(info["folder"], "");
+    assert_eq!(info["other_skins"], serde_json::json!(["2003/"]));
+}

@@ -99,6 +99,12 @@ Skins made for the classicPro plugin (most "cPro" skins) are colour themes: thei
 are in the plugin's files in Winamp's `Plugins` folder, not in the skin. They fail with "the
 skin shows no window", and the message says which plugin they are made for.
 
+A `.wal` or `.wsz` holds one skin, at its root or in one folder. Some archives are packs of
+several skins in sibling folders, zipped to be unpacked into Winamp's skin folder by hand;
+a skin in such a pack may take files from a sibling (`../WinampXP/xml/...`). walkit reads
+the first folder only and warns that the archive is a pack. A skin at the root is the
+archive's skin, as in Winamp, and folders beside it are only more files.
+
 Both options take a file or an address. Neither file ships with this repository: they are
 Winamp's art.
 

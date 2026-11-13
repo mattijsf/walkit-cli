@@ -475,6 +475,23 @@ fn render_one(
             plugins.join(" and ")
         ));
     }
+    // a .wal or .wsz holds one skin, at its root or in one folder: several folders and none
+    // at the root is a pack to unpack by hand, where a skin may take files from a sibling
+    // folder that walkit does not read
+    if let [read, others @ ..] = skin.folders.as_slice() {
+        if !read.is_empty() && !others.is_empty() {
+            let name = |f: &String| format!("\"{}\"", f.trim_end_matches('/'));
+            let pack = format!(
+                "the archive is not a single skin but a pack of {} skins to unpack by hand; only {} \
+                 is read, without {}",
+                others.len() + 1,
+                name(read),
+                others.iter().map(name).collect::<Vec<_>>().join(", ")
+            );
+            warnings.push(pack.clone());
+            reasons.push(pack);
+        }
+    }
     let explain = |problem: String| {
         std::iter::once(problem)
             .chain(reasons.iter().cloned())

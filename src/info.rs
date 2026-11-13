@@ -419,23 +419,10 @@ fn archive(bytes: &[u8]) -> Archive {
     if let (Some(first), Some(last)) = (dates.first(), dates.last()) {
         out.dates = Some([first.clone(), last.clone()]);
     }
-    // as the engine picks the folder: the first that holds skin.xml, else main.bmp
-    for marker in ["skin.xml", "main.bmp"] {
-        let mut folders: Vec<String> = Vec::new();
-        for name in &names {
-            let lower = name.to_lowercase();
-            if lower == marker || lower.ends_with(&format!("/{marker}")) {
-                let folder = name[..name.len() - marker.len()].to_string();
-                if !folders.contains(&folder) {
-                    folders.push(folder);
-                }
-            }
-        }
-        if !folders.is_empty() {
-            out.folder = folders.remove(0);
-            out.other_skins = folders;
-            break;
-        }
+    let mut folders = crate::skin::skin_folders(&names);
+    if !folders.is_empty() {
+        out.folder = folders.remove(0);
+        out.other_skins = folders;
     }
     out
 }

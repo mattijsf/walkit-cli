@@ -135,7 +135,7 @@ walkit info Bento.wal
 walkit info --json skins/ > skins.json
 ```
 
-prints what is known about a skin: its md5 and files, the author's readme and other text
+prints what is known about a skin: its md5 and files, its readme, the author's other text
 files, and by kind:
 
 - a classic skin: the bitmaps it lacks and the optional ones it has, the playlist's colours
@@ -145,6 +145,13 @@ files, and by kind:
   the format version, its containers, the windows that open once it has loaded and their
   sizes, its colour themes, scripts and fonts, the parts of drawn windows nothing defines
   (such as `wasabi:standardframe:status` without `--wasabi`), and the plugin it is made for.
+
+The readme is picked as the Winamp Skin Museum picks it (`getReadme` in webamp's
+`packages/skin-database/data/SkinModel.ts`): the first entry, in the archive's order, whose
+name ends in `.txt` or holds `file_id.diz`, leaving out the files Winamp and its plugins read
+(`pledit.txt`, `genex.txt`, `region.txt` and others). Its path in the archive is printed with
+it. Text that is not UTF-8 is read as Windows-1252, where the museum shows `�`. The museum
+shows no readme for modern skins; `info` picks one by the same rule.
 
 `--json` prints an object for one skin and an array for more. `--base` and `--wasabi` lay the
 same files under the skins as for `render`.

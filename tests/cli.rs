@@ -414,3 +414,44 @@ fn info_names_the_parts_a_window_lacks() {
     );
     assert_eq!(infos[1]["name"], "walkit-modern");
 }
+
+#[test]
+fn info_picks_the_readme_as_the_museum_does() {
+    let dir = Scratch::new("info-readme");
+    let skin = dir.path("notes.wsz");
+    let classic = std::fs::read(CLASSIC).unwrap();
+    let mut from = zip::ZipArchive::new(std::io::Cursor::new(classic)).unwrap();
+    let mut out = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    let options = zip::write::SimpleFileOptions::default();
+    // settings files come first and are passed over; the first other text file is the readme
+    for (name, bytes) in [
+        ("Notes/pledit.txt", &b"[Text]\r\nFont=Arial"[..]),
+        ("Notes/genex.txt", b"not a readme"),
+        ("Notes/About.TXT", b"\xa9 2004 Someone \x96 enjoy"),
+        ("Notes/readme.txt", b"second"),
+    ] {
+        out.start_file(name, options).unwrap();
+        out.write_all(bytes).unwrap();
+    }
+    for i in 0..from.len() {
+        let entry = from.by_index(i).unwrap();
+        let name = format!("Notes/{}", entry.name());
+        if !name.ends_with(".txt") {
+            out.raw_copy_file_rename(entry, name).unwrap();
+        }
+    }
+    out.finish().unwrap();
+    let result = run(&["info", "--json", skin.to_str().unwrap()]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let info: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(
+        info["readme"],
+        serde_json::json!({"file": "Notes/About.TXT", "text": "© 2004 Someone – enjoy"})
+    );
+    let result = run(&["info", skin.to_str().unwrap()]);
+    assert!(
+        text(&result.stdout).contains("readme (from Notes/About.TXT):"),
+        "{}",
+        text(&result.stdout)
+    );
+}

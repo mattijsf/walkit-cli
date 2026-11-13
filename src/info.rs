@@ -40,12 +40,22 @@ pub struct Info {
     pub kind: &'static str,
     /// The files in the archive, by path.
     pub files: Vec<String>,
+    /// The readme, picked as the Winamp Skin Museum picks it; `None` when no file qualifies.
+    pub readme: Option<Readme>,
     /// The author's text files: readmes, licences, notes.
     pub texts: Vec<Text>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub classic: Option<ClassicInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modern: Option<ModernInfo>,
+}
+
+/// The skin's readme.
+#[derive(Debug, Serialize)]
+pub struct Readme {
+    /// Its path in the archive, as the archive writes it (with any folder the skin is in).
+    pub file: String,
+    pub text: String,
 }
 
 /// A text file of the author's.
@@ -167,6 +177,7 @@ pub fn inspect(skin: &Skin, bytes: &[u8], name: &str, params: &Params) -> Info {
             Kind::Modern => "modern",
         },
         files,
+        readme: readme(bytes),
         texts,
         classic,
         modern,
@@ -298,6 +309,57 @@ fn modern(skin: &Skin, files: &[String], name: &str, params: &Params) -> ModernI
     }
 }
 
+/// The names the museum never takes for a readme: what Winamp and its plugins read, and
+/// files download sites add. The museum's pattern anchors only its last name at the end.
+const NOT_README: [&str; 13] = [
+    "dialogs.txt",
+    "genex.txt",
+    "genexinfo.txt",
+    "gen_gslyrics.txt",
+    "region.txt",
+    "pledit.txt",
+    "viscolor.txt",
+    "winampmb.txt",
+    "\"gen_ex help.txt",
+    "mbinner.txt",
+    "winampskins.info.txt",
+    "albumlist.txt",
+    "covertag.txt",
+];
+
+/// Whether the museum takes the archive entry `name` for a readme: `getReadme` in the
+/// webamp repository's `packages/skin-database/data/SkinModel.ts` tests the entry's full
+/// name against `/(file_id\.diz)|(\.txt)$/i` and not against its list of other files.
+pub fn is_museum_readme(name: &str) -> bool {
+    let name = name.to_lowercase();
+    let readme = name.contains("file_id.diz") || name.ends_with(".txt");
+    let not =
+        NOT_README.iter().any(|n| name.contains(n)) || name.ends_with("1001winampskins.com.txt");
+    readme && !not
+}
+
+/// The first entry of the archive, in the archive's order, the museum takes for a readme.
+fn readme(bytes: &[u8]) -> Option<Readme> {
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).ok()?;
+    for i in 0..zip.len() {
+        let Ok(mut entry) = zip.by_index(i) else {
+            continue;
+        };
+        let name = entry.name().to_string();
+        if entry.is_dir() || !is_museum_readme(&name) {
+            continue;
+        }
+        let mut text = Vec::new();
+        std::io::Read::read_to_end(&mut std::io::Read::take(&mut entry, 1 << 20), &mut text)
+            .ok()?;
+        return Some(Readme {
+            file: name,
+            text: decode(&text),
+        });
+    }
+    None
+}
+
 /// Every element under `node`, itself first.
 fn walk(node: &Rc<XmlNode>, out: &mut Vec<Rc<XmlNode>>) {
     out.push(node.clone());
@@ -323,11 +385,24 @@ fn base_name(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase()
 }
 
-/// Text as skins write it: UTF-8, or else Windows' Western code page, read as Latin-1.
+/// What Windows' Western code page (1252) has at 0x80 to 0x9f, where Latin-1 has control
+/// characters; the five it leaves out stay as they are.
+const CP1252_HIGH: [char; 32] = [
+    '€', '\u{81}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{8d}', 'Ž', '\u{8f}',
+    '\u{90}', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '\u{9d}', 'ž', 'Ÿ',
+];
+
+/// Text as skins write it: UTF-8, or else Windows' Western code page (1252).
 fn decode(bytes: &[u8]) -> String {
     let text = match std::str::from_utf8(bytes) {
         Ok(text) => text.to_string(),
-        Err(_) => bytes.iter().map(|b| *b as char).collect(),
+        Err(_) => bytes
+            .iter()
+            .map(|b| match b {
+                0x80..=0x9f => CP1252_HIGH[(b - 0x80) as usize],
+                b => *b as char,
+            })
+            .collect(),
     };
     text.trim_start_matches('\u{FEFF}')
         .replace("\r\n", "\n")
@@ -415,7 +490,16 @@ impl Info {
             line("regions", &c.regions.join(", "));
             line("cursors", &count(&c.cursors));
         }
+        if let Some(r) = &self.readme {
+            let _ = writeln!(out, "\n  readme (from {}):", r.file);
+            for l in r.text.trim_end().lines() {
+                let _ = writeln!(out, "    {}", l.trim_end());
+            }
+        }
         for t in &self.texts {
+            if self.readme.as_ref().is_some_and(|r| r.text == t.text) {
+                continue;
+            }
             let _ = writeln!(out, "\n  {}:", t.file);
             for l in t.text.trim_end().lines() {
                 let _ = writeln!(out, "    {}", l.trim_end());

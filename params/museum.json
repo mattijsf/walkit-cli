@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/mattijsf/walkit-cli/main/schemas/params.schema.json",
   "output": {
     "scale": 1,
     "background": null,

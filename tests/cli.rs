@@ -351,3 +351,199 @@ fn a_flat_picture_names_the_wasabi_parts_the_skin_lacks() {
         text(&result.stderr)
     );
 }
+
+#[test]
+fn info_tells_what_a_modern_skin_says_of_itself() {
+    let result = run(&["info", MODERN]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let out = text(&result.stdout);
+    for line in [
+        "kind          modern",
+        "title         walkit modern",
+        "author        walkit",
+        "containers    main \"Main Window\", pledit \"Playlist Editor\"",
+        "windows       main/normal 300x112",
+    ] {
+        assert!(out.contains(line), "{line} in\n{out}");
+    }
+    assert!(!out.contains("missing parts"), "{out}");
+}
+
+#[test]
+fn info_reads_a_classic_skins_settings() {
+    let result = run(&["info", "--json", CLASSIC]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let info: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(info["kind"], "classic");
+    let classic = &info["classic"];
+    assert_eq!(classic["missing_sheets"], serde_json::json!([]));
+    assert_eq!(info["folder"], "");
+    assert_eq!(classic["playlist"]["font"], "Arial");
+    assert_eq!(classic["vis_colors"].as_array().unwrap().len(), 24);
+}
+
+#[test]
+fn info_names_the_parts_a_window_lacks() {
+    let dir = Scratch::new("info-wasabi");
+    let skin = dir.path("frame.wal");
+    let mut out = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    out.start_file("skin.xml", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    out.write_all(
+        br#"<WasabiXML><skininfo><name>Frame</name><author>Someone</author></skininfo>
+        <container id="main" default_visible="1"><layout id="normal" w="100" h="40">
+        <Wasabi:StandardFrame:Status x="0" y="0" w="0" h="0" relatw="1" relath="1"/>
+        </layout></container></WasabiXML>"#,
+    )
+    .unwrap();
+    out.start_file("readme.txt", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    out.write_all(b"Made by someone.\r\nEnjoy.").unwrap();
+    out.finish().unwrap();
+    let result = run(&["info", "--json", skin.to_str().unwrap(), MODERN]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let infos: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let frame = &infos[0];
+    assert_eq!(frame["modern"]["skin_info"]["author"], "Someone");
+    assert_eq!(
+        frame["modern"]["missing_parts"],
+        serde_json::json!([{"tag": "wasabi:standardframe:status", "container": "main"}])
+    );
+    assert_eq!(
+        frame["texts"],
+        serde_json::json!([{"file": "readme.txt", "text": "Made by someone.\nEnjoy."}])
+    );
+    assert_eq!(infos[1]["name"], "walkit-modern");
+}
+
+#[test]
+fn info_picks_the_readme_as_the_museum_does() {
+    let dir = Scratch::new("info-readme");
+    let skin = dir.path("notes.wsz");
+    let classic = std::fs::read(CLASSIC).unwrap();
+    let mut from = zip::ZipArchive::new(std::io::Cursor::new(classic)).unwrap();
+    let mut out = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    let options = zip::write::SimpleFileOptions::default();
+    // settings files come first and are passed over; the first other text file is the readme
+    for (name, bytes) in [
+        ("Notes/pledit.txt", &b"[Text]\r\nFont=Arial"[..]),
+        ("Notes/genex.txt", b"not a readme"),
+        ("Notes/About.TXT", b"\xa9 2004 Someone \x96 enjoy"),
+        ("Notes/readme.txt", b"second"),
+    ] {
+        out.start_file(name, options).unwrap();
+        out.write_all(bytes).unwrap();
+    }
+    for i in 0..from.len() {
+        let entry = from.by_index(i).unwrap();
+        let name = format!("Notes/{}", entry.name());
+        if !name.ends_with(".txt") {
+            out.raw_copy_file_rename(entry, name).unwrap();
+        }
+    }
+    out.finish().unwrap();
+    let result = run(&["info", "--json", skin.to_str().unwrap()]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let info: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(
+        info["readme"],
+        serde_json::json!({"file": "Notes/About.TXT", "text": "© 2004 Someone – enjoy"})
+    );
+    let result = run(&["info", skin.to_str().unwrap()]);
+    assert!(
+        text(&result.stdout).contains("readme (from Notes/About.TXT):"),
+        "{}",
+        text(&result.stdout)
+    );
+}
+
+#[test]
+fn info_tells_where_in_the_archive_the_skin_is() {
+    let dir = Scratch::new("info-folders");
+    let skin = dir.path("pack.wal");
+    let modern = std::fs::read(MODERN).unwrap();
+    let mut from = zip::ZipArchive::new(std::io::Cursor::new(modern)).unwrap();
+    let mut out = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    let options = zip::write::SimpleFileOptions::default()
+        .last_modified_time(zip::DateTime::from_date_and_time(2004, 5, 6, 7, 8, 10).unwrap());
+    // two skins in one archive: the first folder with a skin.xml is the one read
+    for folder in ["Blue/", "Red/"] {
+        for i in 0..from.len() {
+            let entry = from.by_index(i).unwrap();
+            let name = format!("{folder}{}", entry.name());
+            out.raw_copy_file_rename(entry, name).unwrap();
+        }
+    }
+    out.start_file("Blue/genex.txt", options).unwrap();
+    out.write_all(b"settings").unwrap();
+    out.start_file("Blue/whatsnew.nfo", options).unwrap();
+    out.write_all(b"news").unwrap();
+    out.finish().unwrap();
+    let result = run(&["info", "--json", skin.to_str().unwrap()]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let info: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(info["folder"], "Blue/");
+    assert_eq!(info["other_skins"], serde_json::json!(["Red/"]));
+    assert_eq!(info["dates"][0], "2004-05-06 07:08:10");
+    assert_eq!(
+        info["texts"],
+        serde_json::json!([{"file": "whatsnew.nfo", "text": "news"}])
+    );
+    let result = run(&["info", skin.to_str().unwrap()]);
+    let out = text(&result.stdout);
+    assert!(out.contains("other skins   Red/"), "{out}");
+}
+
+/// An archive of the original modern skin in each of `folders` ("" for the root).
+fn pack(path: &Path, folders: &[&str]) {
+    let modern = std::fs::read(MODERN).unwrap();
+    let mut from = zip::ZipArchive::new(std::io::Cursor::new(modern)).unwrap();
+    let mut out = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+    for folder in folders {
+        for i in 0..from.len() {
+            let entry = from.by_index(i).unwrap();
+            let name = format!("{folder}{}", entry.name());
+            out.raw_copy_file_rename(entry, name).unwrap();
+        }
+    }
+    out.finish().unwrap();
+}
+
+#[test]
+fn a_pack_of_skins_says_it_is_no_single_skin() {
+    let dir = Scratch::new("pack");
+    let skin = dir.path("pack.wal");
+    pack(&skin, &["Blue/", "Red/"]);
+    let result = run(&[
+        "render",
+        skin.to_str().unwrap(),
+        "-o",
+        dir.path("out.png").to_str().unwrap(),
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let warning = text(&result.stderr);
+    assert!(
+        warning.contains("not a single skin but a pack of 2 skins to unpack by hand; only \"Blue\" is read, without \"Red\""),
+        "{warning}"
+    );
+    // a skin at the root is the archive's skin, as Winamp reads it; a folder beside it is
+    // only more files
+    let skin = dir.path("root.wal");
+    pack(&skin, &["2003/", ""]);
+    let result = run(&[
+        "render",
+        skin.to_str().unwrap(),
+        "-o",
+        dir.path("root.png").to_str().unwrap(),
+    ]);
+    assert!(result.status.success());
+    assert!(
+        !text(&result.stderr).contains("warning"),
+        "{}",
+        text(&result.stderr)
+    );
+    let result = run(&["info", "--json", skin.to_str().unwrap()]);
+    let info: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(info["folder"], "");
+    assert_eq!(info["other_skins"], serde_json::json!(["2003/"]));
+}

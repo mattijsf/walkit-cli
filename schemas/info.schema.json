@@ -1,0 +1,431 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mattijsf/walkit-cli/main/schemas/info.schema.json",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The skin's name: its file name without the ending."
+    },
+    "md5": {
+      "type": "string"
+    },
+    "bytes": {
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0
+    },
+    "kind": {
+      "$ref": "#/$defs/Kind"
+    },
+    "folder": {
+      "type": "string",
+      "description": "The folder in the archive the skin is in, as the archive writes it; empty at the root."
+    },
+    "other_skins": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The folders of the other skins in the same archive, which are left out."
+    },
+    "dates": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "The earliest and the latest date of the archive's files, as `YYYY-MM-DD HH:MM:SS`."
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The files of the skin, by path in its folder."
+    },
+    "readme": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Readme"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The readme, picked as the Winamp Skin Museum picks it; `None` when no file qualifies."
+    },
+    "texts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Text"
+      },
+      "description": "The author's text files: readmes, licences, notes."
+    },
+    "classic": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClassicInfo"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "modern": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ModernInfo"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "md5",
+    "bytes",
+    "kind",
+    "folder",
+    "other_skins",
+    "files",
+    "texts"
+  ],
+  "description": "Everything known about one skin.",
+  "title": "Info",
+  "$defs": {
+    "Kind": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "classic",
+          "description": "`main.bmp` and no `skin.xml`: a `.wsz`."
+        },
+        {
+          "type": "string",
+          "const": "modern",
+          "description": "`skin.xml`: a `.wal`."
+        }
+      ],
+      "description": "What kind of skin an archive holds."
+    },
+    "Readme": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Its path in the archive, as the archive writes it (with any folder the skin is in)."
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "text"
+      ],
+      "description": "The skin's readme."
+    },
+    "Text": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "text"
+      ],
+      "description": "A text file of the author's."
+    },
+    "ClassicInfo": {
+      "type": "object",
+      "properties": {
+        "missing_sheets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Of the twelve bitmaps the windows are drawn from, those the skin has not."
+        },
+        "extras": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The optional bitmaps it has (`nums_ex.bmp`, `gen.bmp`, ...)."
+        },
+        "playlist": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Playlist"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The playlist's colours and font from `pledit.txt`; `None` without one."
+        },
+        "vis_colors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The 24 vis colours from `viscolor.txt`; empty without one."
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The windows `region.txt` gives a shape, such as `normal` or `equalizer`."
+        },
+        "cursors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The cursor files."
+        }
+      },
+      "required": [
+        "missing_sheets",
+        "extras",
+        "vis_colors",
+        "regions",
+        "cursors"
+      ],
+      "description": "What a classic skin holds."
+    },
+    "Playlist": {
+      "type": "object",
+      "properties": {
+        "normal": {
+          "type": "string"
+        },
+        "current": {
+          "type": "string"
+        },
+        "normal_bg": {
+          "type": "string"
+        },
+        "selected_bg": {
+          "type": "string"
+        },
+        "font": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "normal",
+        "current",
+        "normal_bg",
+        "selected_bg",
+        "font"
+      ],
+      "description": "`pledit.txt`."
+    },
+    "ModernInfo": {
+      "type": "object",
+      "properties": {
+        "skin_info": {
+          "$ref": "#/$defs/SkinInfo",
+          "description": "`<skininfo>`."
+        },
+        "format_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The version of the skin format, from the root element of `skin.xml`."
+        },
+        "containers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Container"
+          },
+          "description": "The containers the skin defines."
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Window"
+          },
+          "description": "The windows on screen once it has loaded, the main one first."
+        },
+        "color_themes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scripts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The compiled scripts."
+        },
+        "fonts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The TrueType font files."
+        },
+        "missing_parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MissingPart"
+          },
+          "description": "The tags in the windows on screen that nothing defines, so they draw nothing."
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The Winamp plugins the skin takes files from."
+        }
+      },
+      "required": [
+        "skin_info",
+        "containers",
+        "windows",
+        "color_themes",
+        "scripts",
+        "fonts",
+        "missing_parts",
+        "plugins"
+      ],
+      "description": "What a modern skin holds and how it loads."
+    },
+    "SkinInfo": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "homepage": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "screenshot": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wacup_screenshot": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The screenshot WACUP shows (`<wacupscreenshot>`)."
+        }
+      },
+      "description": "`<skininfo>`: what the author says of the skin."
+    },
+    "Container": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default_visible": {
+          "type": "boolean",
+          "description": "Whether it opens when the skin loads."
+        }
+      },
+      "required": [
+        "id",
+        "default_visible"
+      ]
+    },
+    "Window": {
+      "type": "object",
+      "properties": {
+        "container": {
+          "type": "string"
+        },
+        "layout": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "container",
+        "layout",
+        "width",
+        "height"
+      ]
+    },
+    "MissingPart": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "container": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "container"
+      ]
+    }
+  }
+}

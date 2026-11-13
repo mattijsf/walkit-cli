@@ -72,6 +72,21 @@ cargo run -- params > params/museum.json
 A test fails when the file and the defaults drift apart. Document the field in the README's
 table. If the default is not what the museum's screenshots show, say why in the README.
 
+## Schemas
+
+`schemas/params.schema.json` and `schemas/info.schema.json` are made from the types in
+`src/params.rs` and `src/info.rs`, their doc comments included. After changing either, or
+the doc comment of a field, regenerate them:
+
+```
+cargo run -- schema params > schemas/params.schema.json
+cargo run -- schema info > schemas/info.schema.json
+```
+
+A test fails when a file is out of date, and another checks that `params/museum.json` and
+what `walkit info --json` prints follow them. The schemas are public: renaming or removing a
+field breaks what others built on them, so treat it as a breaking change.
+
 ## Test skins
 
 `tests/skins` holds two original skins. Skins made by other people, Winamp's base skin and

@@ -3,11 +3,16 @@
 //! The parameter file: what a preview shows and how. Every field has a default, and the
 //! defaults are the Winamp Skin Museum's screenshot state (see the README for where each
 //! value comes from), so a file only names what it changes.
+//!
+//! The file's JSON Schema is
+//! [`schemas/params.schema.json`](https://github.com/mattijsf/walkit-cli/blob/main/schemas/params.schema.json)
+//! in the repository, made by [`crate::schema::params`].
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Everything a preview is made from besides the skin itself.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Params {
     pub output: Output,
@@ -20,18 +25,25 @@ pub struct Params {
 }
 
 impl Params {
-    /// Reads a parameter file (JSON).
+    /// Reads a parameter file (JSON). A `$schema` naming the file's schema is passed over.
     pub fn from_json(text: &str) -> Result<Params, String> {
-        let params: Params = serde_json::from_str(text).map_err(|e| e.to_string())?;
+        let mut value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+        if let Some(object) = value.as_object_mut() {
+            object.remove("$schema");
+        }
+        let params: Params = serde_json::from_value(value).map_err(|e| e.to_string())?;
         params.check()?;
         Ok(params)
     }
 
-    /// The parameters as a JSON file with every field spelled out.
+    /// The parameters as a JSON file with every field spelled out, naming its schema.
     pub fn to_json(&self) -> String {
-        let mut text = serde_json::to_string_pretty(self).expect("parameters serialize");
-        text.push('\n');
-        text
+        let text = serde_json::to_string_pretty(self).expect("parameters serialize");
+        let body = text.strip_prefix('{').unwrap_or(&text);
+        format!(
+            "{{\n  \"$schema\": \"{}\",{body}\n",
+            crate::schema::url("params")
+        )
     }
 
     fn check(&self) -> Result<(), String> {
@@ -70,7 +82,7 @@ pub fn parse_color(text: &str) -> Result<u32, String> {
 }
 
 /// The image written.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Output {
     /// Device pixels per skin pixel, a whole number; pictures scale by nearest pixels.
@@ -92,7 +104,7 @@ impl Default for Output {
 }
 
 /// A resized copy of the preview, written as `<name><suffix>.png`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Thumbnail {
     /// Its width in pixels.
@@ -105,7 +117,7 @@ pub struct Thumbnail {
 }
 
 /// How a classic skin (`.wsz`) is set out.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Classic {
     /// The image's size in skin pixels; `null` fits it to the windows.
@@ -153,7 +165,7 @@ impl Default for Classic {
 }
 
 /// A classic window: whether it shows, and where its top left corner goes.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Window {
     pub show: bool,
@@ -163,7 +175,7 @@ pub struct Window {
 
 /// The classic playlist window, which also has a size (Winamp sizes it in steps of 25 by 29
 /// from 275 by 116).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlaylistWindow {
     pub show: bool,
@@ -174,7 +186,7 @@ pub struct PlaylistWindow {
 }
 
 /// How a modern skin (`.wal`) is set out.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Modern {
     /// The screen the skin's scripts see, in skin pixels.
@@ -201,7 +213,7 @@ impl Default for Modern {
 }
 
 /// What the transport does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum StatusParam {
     Playing,
@@ -210,7 +222,7 @@ pub enum StatusParam {
 }
 
 /// The player's state.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlayerParams {
     pub status: StatusParam,
@@ -245,7 +257,7 @@ impl Default for PlayerParams {
 }
 
 /// The equalizer. Sliders run 0 (-12 dB) to 100 (+12 dB).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Equalizer {
     pub on: bool,
@@ -267,7 +279,7 @@ impl Default for Equalizer {
 }
 
 /// What the vis area shows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum VisModeParam {
     Analyzer,
@@ -276,7 +288,7 @@ pub enum VisModeParam {
 }
 
 /// The visualizer: a still spectrum.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Vis {
     pub mode: VisModeParam,
@@ -301,7 +313,7 @@ impl Default for Vis {
 }
 
 /// One playlist entry.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TrackParam {
     /// Shown as "artist - title"; an empty artist leaves the title alone.
@@ -324,7 +336,7 @@ impl TrackParam {
 }
 
 /// The playlist.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Playlist {
     pub tracks: Vec<TrackParam>,

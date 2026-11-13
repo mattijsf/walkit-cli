@@ -31,26 +31,40 @@ const FONTS: [(&str, &[u8]); 4] = [
     ),
 ];
 
-/// The bitmaps Winamp draws a classic skin's three windows from. `nums_ex.bmp` and
-/// `balance.bmp` are left out: `numbers.bmp` and `volume.bmp` stand in for them.
-const CLASSIC_SHEETS: [&str; 12] = [
-    "main.bmp",
-    "cbuttons.bmp",
-    "titlebar.bmp",
-    "shufrep.bmp",
-    "text.bmp",
-    "volume.bmp",
-    "monoster.bmp",
-    "playpaus.bmp",
-    "posbar.bmp",
-    "numbers.bmp",
-    "eqmain.bmp",
-    "pledit.bmp",
-];
-
 /// The files of a zip archive in memory. A skin zipped inside a folder has that folder
 /// stripped.
 pub fn unzip(bytes: &[u8]) -> Result<MemoryFiles, String> {
+    unpack(bytes).map(|(files, _)| files)
+}
+
+/// The folders in an archive that hold a skin, as the archive writes them (empty for the
+/// root): those with a `skin.xml`, or when none has one, those with a `main.bmp`. The root
+/// comes first, then the others in the archive's order; the first is the one the engine reads.
+pub fn skin_folders(names: &[String]) -> Vec<String> {
+    for marker in ["skin.xml", "main.bmp"] {
+        let mut folders: Vec<String> = Vec::new();
+        for name in names {
+            let lower = name.to_lowercase();
+            if lower == marker || lower.ends_with(&format!("/{marker}")) {
+                let folder = name[..name.len() - marker.len()].to_string();
+                if !folders.contains(&folder) {
+                    folders.push(folder);
+                }
+            }
+        }
+        if !folders.is_empty() {
+            if let Some(root) = folders.iter().position(String::is_empty) {
+                let root = folders.remove(root);
+                folders.insert(0, root);
+            }
+            return folders;
+        }
+    }
+    Vec::new()
+}
+
+/// The skin's files, as [`unzip`] gives them, and the paths of every file in the archive.
+fn unpack(bytes: &[u8]) -> Result<(MemoryFiles, Vec<String>), String> {
     let mut zip =
         zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("not a zip archive: {e}"))?;
     let mut all = MemoryFiles::new();
@@ -83,7 +97,7 @@ pub fn unzip(bytes: &[u8]) -> Result<MemoryFiles, String> {
         names.push(name);
     }
     let folder = files::skin_folder(names.iter().map(String::as_str)).unwrap_or_default();
-    Ok(all.in_folder(&folder))
+    Ok((all.in_folder(&folder), names))
 }
 
 /// The Windows fonts skins name without a file, by file name, and the stand-in each replaces.
@@ -135,7 +149,8 @@ impl SkinFiles for WithFonts {
 }
 
 /// What kind of skin an archive holds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Kind {
     /// `main.bmp` and no `skin.xml`: a `.wsz`.
     Classic,
@@ -143,9 +158,23 @@ pub enum Kind {
     Modern,
 }
 
+impl Kind {
+    /// `classic` or `modern`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Kind::Classic => "classic",
+            Kind::Modern => "modern",
+        }
+    }
+}
+
 /// A skin ready to load: its files, and what lies under them.
 pub struct Skin {
     pub kind: Kind,
+    /// The folders in the archive that hold a skin; see [`skin_folders`]. The first is the one
+    /// read. A skin at the root is the archive's skin, as Winamp reads it; with none there,
+    /// more than one folder is a pack of skins zipped for unpacking by hand.
+    pub folders: Vec<String>,
     archive: MemoryFiles,
     under: Option<MemoryFiles>,
     fonts: MemoryFiles,
@@ -159,7 +188,7 @@ impl Skin {
         base: Option<&MemoryFiles>,
         wasabi: Option<&MemoryFiles>,
     ) -> Result<Skin, String> {
-        let archive = unzip(bytes)?;
+        let (archive, names) = unpack(bytes)?;
         let kind = if walkit::classic::is_classic(&archive) {
             Kind::Classic
         } else if archive.exists("skin.xml") {
@@ -173,6 +202,7 @@ impl Skin {
         };
         Ok(Skin {
             kind,
+            folders: skin_folders(&names),
             archive,
             under: under.cloned(),
             fonts: fonts(),
@@ -208,7 +238,7 @@ impl Skin {
         if self.kind != Kind::Classic || self.under.is_some() {
             return Vec::new();
         }
-        CLASSIC_SHEETS
+        walkit::info::CLASSIC_SHEETS
             .into_iter()
             .filter(|sheet| !self.archive.exists(sheet))
             .collect()
@@ -255,28 +285,24 @@ impl Skin {
         if self.kind != Kind::Modern {
             return Vec::new();
         }
-        let mut plugins = Vec::new();
-        for text in self.xml_files() {
-            let lower = text.to_ascii_lowercase();
-            for (at, _) in lower.match_indices("<include") {
-                let tag = &text[at..];
-                let tag = &tag[..tag.find('>').unwrap_or(tag.len())];
-                let path = tag.replace('\\', "/");
-                let Some(start) = path.to_ascii_lowercase().find("/plugins/") else {
-                    continue;
-                };
-                let rest = &path[start + "/plugins/".len()..];
-                let name: String = rest
-                    .chars()
-                    .take_while(|c| *c != '/' && *c != '"' && *c != '\'')
-                    .collect();
-                if !name.is_empty() && !plugins.contains(&name) {
-                    plugins.push(name);
-                }
-            }
-        }
-        plugins.sort();
-        plugins
+        walkit::info::modern(&self.archive).plugins
+    }
+
+    /// The files of the skin's own archive, without the base or the fonts under them.
+    pub fn own_files(&self) -> &MemoryFiles {
+        &self.archive
+    }
+
+    /// The paths of the files in the skin's own archive, sorted.
+    pub fn names(&self) -> Vec<String> {
+        let mut names = self.archive.names();
+        names.sort();
+        names
+    }
+
+    /// A file of the skin's own archive, its path matched as the engine matches it.
+    pub fn read(&self, path: &str) -> Option<Rc<[u8]>> {
+        self.archive.read(path)
     }
 
     /// The text of the skin's own XML files.

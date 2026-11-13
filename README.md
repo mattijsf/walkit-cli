@@ -99,6 +99,12 @@ Skins made for the classicPro plugin (most "cPro" skins) are colour themes: thei
 are in the plugin's files in Winamp's `Plugins` folder, not in the skin. They fail with "the
 skin shows no window", and the message says which plugin they are made for.
 
+A `.wal` or `.wsz` holds one skin, at its root or in one folder. Some archives are packs of
+several skins in sibling folders, zipped to be unpacked into Winamp's skin folder by hand;
+a skin in such a pack may take files from a sibling (`../WinampXP/xml/...`). walkit reads
+the first folder only and warns that the archive is a pack. A skin at the root is the
+archive's skin, as in Winamp, and folders beside it are only more files.
+
 Both options take a file or an address. Neither file ships with this repository: they are
 Winamp's art.
 
@@ -128,10 +134,47 @@ one classic window), and can write a picture of where the two differ. `--min-sam
 it fail under a threshold. `scripts/compare-with-museum.sh <md5>...` renders skins from the
 museum and measures each against the museum's screenshot.
 
+### Skin info
+
+```
+walkit info Bento.wal
+walkit info --json skins/ > skins.json
+```
+
+prints what is known about a skin: its md5 and files, the folder in the archive it is in and
+any other skins packed beside it, the earliest and latest file dates, its readme, the
+author's other text files (`.txt`, `.nfo`, `.diz`, but not those Winamp or a plugin reads),
+and by kind:
+
+- a classic skin: the bitmaps it lacks and the optional ones it has, the playlist's colours
+  and font from `pledit.txt`, the 24 vis colours, the windows `region.txt` shapes, and its
+  cursors.
+- a modern skin: what `<skininfo>` says (title, version, author, comment, email, homepage, screenshots),
+  the format version, its containers, the windows that open once it has loaded and their
+  sizes, its colour themes, scripts and fonts, the parts of drawn windows nothing defines
+  (such as `wasabi:standardframe:status` without `--wasabi`), and the plugin it is made for.
+
+The readme is picked as the Winamp Skin Museum picks it (`getReadme` in webamp's
+`packages/skin-database/data/SkinModel.ts`): the first entry, in the archive's order, whose
+name ends in `.txt` or holds `file_id.diz`, leaving out the files Winamp and its plugins read
+(`pledit.txt`, `genex.txt`, `region.txt` and others). Its path in the archive is printed with
+it. Text that is not UTF-8 is read as Windows-1252, where the museum shows `�`. The museum
+shows no readme for modern skins; `info` picks one by the same rule.
+
+`--json` prints an object for one skin and an array for more. `--base` and `--wasabi` lay the
+same files under the skins as for `render`. Each object follows the JSON Schema in
+[`schemas/info.schema.json`](schemas/info.schema.json) (`walkit schema info` prints it),
+which describes every field.
+
 ## The parameter file
 
 `--params file.json` sets what the preview shows. Every field is optional: a file names only
 what it changes, and everything else keeps the museum's value. An unknown field is an error.
+
+The file's JSON Schema is [`schemas/params.schema.json`](schemas/params.schema.json)
+(`walkit schema params` prints it). A file that names it in `"$schema"`, as the one
+`walkit params` prints does, gets completion and checking in editors such as VS Code;
+walkit reads past that field.
 
 `walkit params` prints the defaults as a complete file. The same file is in the
 repository as [`params/museum.json`](params/museum.json):

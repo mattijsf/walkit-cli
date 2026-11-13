@@ -5,10 +5,12 @@
 
 pub mod compare;
 pub mod host;
+pub mod info;
 pub mod input;
 pub mod output;
 pub mod params;
 pub mod player;
 pub mod render;
+pub mod schema;
 pub mod shot;
 pub mod skin;

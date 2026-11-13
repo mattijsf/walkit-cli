@@ -166,12 +166,23 @@ impl SkinFiles for WithFonts {
 }
 
 /// What kind of skin an archive holds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Kind {
     /// `main.bmp` and no `skin.xml`: a `.wsz`.
     Classic,
     /// `skin.xml`: a `.wal`.
     Modern,
+}
+
+impl Kind {
+    /// `classic` or `modern`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Kind::Classic => "classic",
+            Kind::Modern => "modern",
+        }
+    }
 }
 
 /// A skin ready to load: its files, and what lies under them.

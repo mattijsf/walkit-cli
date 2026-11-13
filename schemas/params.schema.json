@@ -1,0 +1,616 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mattijsf/walkit-cli/main/schemas/params.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "output": {
+      "$ref": "#/$defs/Output",
+      "default": {
+        "scale": 1,
+        "background": null,
+        "thumbnails": []
+      }
+    },
+    "classic": {
+      "$ref": "#/$defs/Classic",
+      "default": {
+        "width": 275,
+        "height": 348,
+        "winamp": "2.91",
+        "main": {
+          "show": true,
+          "x": 0,
+          "y": 0
+        },
+        "equalizer": {
+          "show": true,
+          "x": 0,
+          "y": 116
+        },
+        "playlist": {
+          "show": true,
+          "x": 0,
+          "y": 232,
+          "width": 275,
+          "height": 116
+        },
+        "playlist_font_size": null,
+        "time_remaining": false
+      }
+    },
+    "modern": {
+      "$ref": "#/$defs/Modern",
+      "default": {
+        "screen": [
+          1440,
+          900
+        ],
+        "settle_ms": 1000,
+        "color_theme": null,
+        "trim": true
+      }
+    },
+    "player": {
+      "$ref": "#/$defs/PlayerParams",
+      "default": {
+        "status": "playing",
+        "position": 3.0,
+        "volume": 78,
+        "balance": 0,
+        "shuffle": true,
+        "repeat": true,
+        "kbps": 128,
+        "khz": 44,
+        "channels": 2
+      }
+    },
+    "equalizer": {
+      "$ref": "#/$defs/Equalizer",
+      "default": {
+        "on": true,
+        "auto": true,
+        "preamp": 56,
+        "bands": [
+          52,
+          74,
+          83,
+          91,
+          80,
+          54,
+          23,
+          19,
+          34,
+          75
+        ]
+      }
+    },
+    "vis": {
+      "$ref": "#/$defs/Vis",
+      "default": {
+        "mode": "analyzer",
+        "bars": [
+          11.75,
+          11.0625,
+          8.5,
+          7.3125,
+          6.75,
+          6.4375,
+          6.25,
+          5.875,
+          5.625,
+          5.25,
+          5.125,
+          4.875,
+          4.8125,
+          4.375,
+          3.625,
+          1.5625
+        ],
+        "peaks": false
+      }
+    },
+    "playlist": {
+      "$ref": "#/$defs/Playlist",
+      "default": {
+        "tracks": [
+          {
+            "artist": "DJ Mike Llama",
+            "title": "Llama Whipping Intro",
+            "seconds": 5
+          },
+          {
+            "artist": "Marilyn Manson",
+            "title": "Rock Is Dead",
+            "seconds": 191
+          },
+          {
+            "artist": "Propellerheads",
+            "title": "Spybreak! (Short One)",
+            "seconds": 240
+          },
+          {
+            "artist": "Ministry",
+            "title": "Bad Blood",
+            "seconds": 300
+          }
+        ],
+        "current": 0,
+        "selected": [
+          2
+        ]
+      }
+    },
+    "$schema": {
+      "description": "The schema the file follows; walkit reads past it.",
+      "type": "string"
+    }
+  },
+  "description": "Everything a preview is made from besides the skin itself.",
+  "title": "Params",
+  "$defs": {
+    "Output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scale": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Device pixels per skin pixel, a whole number; pictures scale by nearest pixels.",
+          "default": 1
+        },
+        "background": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "What shows where no window does: `null` for transparent, or `#rrggbb`.",
+          "default": null
+        },
+        "thumbnails": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Thumbnail"
+          },
+          "description": "Smaller (or larger) copies written next to the preview.",
+          "default": []
+        }
+      },
+      "description": "The image written."
+    },
+    "Thumbnail": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Its width in pixels."
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Its height; left out, the preview's shape is kept.",
+          "default": null
+        },
+        "suffix": {
+          "type": "string",
+          "description": "What its file name adds to the preview's, such as `-thumb`."
+        }
+      },
+      "required": [
+        "width",
+        "suffix"
+      ],
+      "description": "A resized copy of the preview, written as `<name><suffix>.png`."
+    },
+    "Classic": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "The image's size in skin pixels; `null` fits it to the windows.",
+          "default": 275
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "default": 348
+        },
+        "winamp": {
+          "type": "string",
+          "description": "The Winamp whose classic windows are shown: \"2.91\" or \"5.666\".",
+          "default": "2.91"
+        },
+        "main": {
+          "$ref": "#/$defs/Window",
+          "default": {
+            "show": true,
+            "x": 0,
+            "y": 0
+          }
+        },
+        "equalizer": {
+          "$ref": "#/$defs/Window",
+          "default": {
+            "show": true,
+            "x": 0,
+            "y": 116
+          }
+        },
+        "playlist": {
+          "$ref": "#/$defs/PlaylistWindow",
+          "default": {
+            "show": true,
+            "x": 0,
+            "y": 232,
+            "width": 275,
+            "height": 116
+          }
+        },
+        "playlist_font_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int32",
+          "description": "The playlist font's size, pixels to the em (Winamp's \"playlist font size\" preference);\n`null` is the Winamp version's own: 10 for 2.91, 12 for 5.666.",
+          "default": null
+        },
+        "time_remaining": {
+          "type": "boolean",
+          "description": "Whether the time counts down.",
+          "default": false
+        }
+      },
+      "description": "How a classic skin (`.wsz`) is set out."
+    },
+    "Window": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "type": "boolean"
+        },
+        "x": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "show",
+        "x",
+        "y"
+      ],
+      "description": "A classic window: whether it shows, and where its top left corner goes."
+    },
+    "PlaylistWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "type": "boolean"
+        },
+        "x": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "y": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "width": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "show",
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "description": "The classic playlist window, which also has a size (Winamp sizes it in steps of 25 by 29\nfrom 275 by 116)."
+    },
+    "Modern": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screen": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "The screen the skin's scripts see, in skin pixels.",
+          "default": [
+            1440,
+            900
+          ]
+        },
+        "settle_ms": {
+          "type": "integer",
+          "format": "int64",
+          "description": "How long the skin runs before the picture is taken, in milliseconds: time for the\nanimations it starts with to finish.",
+          "default": 1000
+        },
+        "color_theme": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A color theme of the skin by name; `null` keeps the skin's own.",
+          "default": null
+        },
+        "trim": {
+          "type": "boolean",
+          "description": "Whether the image is cut to what the skin draws: a window's box is often larger than\nits shape.",
+          "default": true
+        }
+      },
+      "description": "How a modern skin (`.wal`) is set out."
+    },
+    "PlayerParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/StatusParam",
+          "default": "playing"
+        },
+        "position": {
+          "type": "number",
+          "format": "double",
+          "description": "Where the song is, in seconds.",
+          "default": 3.0
+        },
+        "volume": {
+          "type": "integer",
+          "format": "int32",
+          "description": "0 to 100.",
+          "default": 78
+        },
+        "balance": {
+          "type": "integer",
+          "format": "int32",
+          "description": "-100 (left) to 100 (right).",
+          "default": 0
+        },
+        "shuffle": {
+          "type": "boolean",
+          "default": true
+        },
+        "repeat": {
+          "type": "boolean",
+          "default": true
+        },
+        "kbps": {
+          "type": "integer",
+          "format": "int32",
+          "default": 128
+        },
+        "khz": {
+          "type": "integer",
+          "format": "int32",
+          "default": 44
+        },
+        "channels": {
+          "type": "integer",
+          "format": "int32",
+          "description": "1 for mono, 2 for stereo.",
+          "default": 2
+        }
+      },
+      "description": "The player's state."
+    },
+    "StatusParam": {
+      "type": "string",
+      "enum": [
+        "playing",
+        "paused",
+        "stopped"
+      ],
+      "description": "What the transport does."
+    },
+    "Equalizer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "on": {
+          "type": "boolean",
+          "default": true
+        },
+        "auto": {
+          "type": "boolean",
+          "default": true
+        },
+        "preamp": {
+          "type": "integer",
+          "format": "int32",
+          "default": 56
+        },
+        "bands": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": "60, 170, 310, 600, 1K, 3K, 6K, 12K, 14K and 16K.",
+          "default": [
+            52,
+            74,
+            83,
+            91,
+            80,
+            54,
+            23,
+            19,
+            34,
+            75
+          ]
+        }
+      },
+      "description": "The equalizer. Sliders run 0 (-12 dB) to 100 (+12 dB)."
+    },
+    "Vis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/VisModeParam",
+          "default": "analyzer"
+        },
+        "bars": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "description": "The analyzer's bars left to right, each 0 to 16 pixels tall. A classic skin shows 19;\nfewer leave the rest empty.",
+          "default": [
+            11.75,
+            11.0625,
+            8.5,
+            7.3125,
+            6.75,
+            6.4375,
+            6.25,
+            5.875,
+            5.625,
+            5.25,
+            5.125,
+            4.875,
+            4.8125,
+            4.375,
+            3.625,
+            1.5625
+          ]
+        },
+        "peaks": {
+          "type": "boolean",
+          "description": "Peak marks over the bars.",
+          "default": false
+        }
+      },
+      "description": "The visualizer: a still spectrum."
+    },
+    "VisModeParam": {
+      "type": "string",
+      "enum": [
+        "analyzer",
+        "scope",
+        "off"
+      ],
+      "description": "What the vis area shows."
+    },
+    "Playlist": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tracks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TrackParam"
+          },
+          "default": [
+            {
+              "artist": "DJ Mike Llama",
+              "title": "Llama Whipping Intro",
+              "seconds": 5
+            },
+            {
+              "artist": "Marilyn Manson",
+              "title": "Rock Is Dead",
+              "seconds": 191
+            },
+            {
+              "artist": "Propellerheads",
+              "title": "Spybreak! (Short One)",
+              "seconds": 240
+            },
+            {
+              "artist": "Ministry",
+              "title": "Bad Blood",
+              "seconds": 300
+            }
+          ]
+        },
+        "current": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The entry that plays, counted from 0.",
+          "default": 0
+        },
+        "selected": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": "The entries shown selected, counted from 0.",
+          "default": [
+            2
+          ]
+        }
+      },
+      "description": "The playlist."
+    },
+    "TrackParam": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "artist": {
+          "type": "string",
+          "description": "Shown as \"artist - title\"; an empty artist leaves the title alone.",
+          "default": ""
+        },
+        "title": {
+          "type": "string"
+        },
+        "seconds": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Its length in seconds."
+        }
+      },
+      "required": [
+        "title",
+        "seconds"
+      ],
+      "description": "One playlist entry."
+    }
+  }
+}

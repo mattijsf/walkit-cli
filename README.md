@@ -162,12 +162,19 @@ it. Text that is not UTF-8 is read as Windows-1252, where the museum shows `�`
 shows no readme for modern skins; `info` picks one by the same rule.
 
 `--json` prints an object for one skin and an array for more. `--base` and `--wasabi` lay the
-same files under the skins as for `render`.
+same files under the skins as for `render`. Each object follows the JSON Schema in
+[`schemas/info.schema.json`](schemas/info.schema.json) (`walkit schema info` prints it),
+which describes every field.
 
 ## The parameter file
 
 `--params file.json` sets what the preview shows. Every field is optional: a file names only
 what it changes, and everything else keeps the museum's value. An unknown field is an error.
+
+The file's JSON Schema is [`schemas/params.schema.json`](schemas/params.schema.json)
+(`walkit schema params` prints it). A file that names it in `"$schema"`, as the one
+`walkit params` prints does, gets completion and checking in editors such as VS Code;
+walkit reads past that field.
 
 `walkit params` prints the defaults as a complete file. The same file is in the
 repository as [`params/museum.json`](params/museum.json):

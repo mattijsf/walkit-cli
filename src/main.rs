@@ -18,7 +18,7 @@ use walkit_cli::input::{self, Source};
 use walkit_cli::output;
 use walkit_cli::params::Params;
 use walkit_cli::shot::shoot;
-use walkit_cli::skin::{self, Kind, Skin};
+use walkit_cli::skin::{self, Skin};
 
 /// Command-line tool for Winamp skins, built on the walkit engine.
 #[derive(Parser)]
@@ -37,9 +37,20 @@ enum Command {
     Params,
     /// Compare two images pixel by pixel.
     Compare(Compare),
+    /// Print a JSON Schema: of the parameter file, or of what `info --json` prints.
+    Schema {
+        #[arg(value_enum)]
+        of: SchemaOf,
+    },
     /// Print what is known about skins: who made them, what is in them, and what the
     /// engine makes of them.
     Info(Info),
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum SchemaOf {
+    Params,
+    Info,
 }
 
 #[derive(clap::Args)]
@@ -146,6 +157,16 @@ fn main() -> ExitCode {
             Ok(true)
         }
         Command::Compare(args) => run_compare(args),
+        Command::Schema { of } => {
+            print!(
+                "{}",
+                match of {
+                    SchemaOf::Params => walkit_cli::schema::params(),
+                    SchemaOf::Info => walkit_cli::schema::info(),
+                }
+            );
+            Ok(true)
+        }
         // skins nest deep: the engine recurses through their groups
         Command::Info(args) => std::thread::Builder::new()
             .stack_size(64 * 1024 * 1024)
@@ -508,10 +529,7 @@ fn render_one(
         None => batch.out_dir.join(format!("{:x}.png", Md5::digest(&bytes))),
     };
     let written = output::write(&shot, &path, &batch.params.output.thumbnails)?;
-    let kind = match skin.kind {
-        Kind::Classic => "classic",
-        Kind::Modern => "modern",
-    };
+    let kind = skin.kind.name();
     let extra = match written.len() {
         1 => String::new(),
         n => format!(", {} thumbnails", n - 1),

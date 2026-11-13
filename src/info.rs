@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 //! What a skin is: who made it, what is in it, and what the engine makes of it.
+//!
+//! [`Info`] is what `walkit info --json` prints for each skin. Its JSON Schema is
+//! [`schemas/info.schema.json`](https://github.com/mattijsf/walkit-cli/blob/main/schemas/info.schema.json)
+//! in the repository, made by [`crate::schema::info`].
 
 use std::fmt::Write as _;
 use std::rc::Rc;
 
 use md5::{Digest, Md5};
+use schemars::JsonSchema;
 use serde::Serialize;
 use walkit::classic::{pledit, region, viscolor};
 use walkit::draw::Rgb;
@@ -28,14 +33,13 @@ const CLASSIC_EXTRAS: [&str; 8] = [
 ];
 
 /// Everything known about one skin.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Info {
     /// The skin's name: its file name without the ending.
     pub name: String,
     pub md5: String,
     pub bytes: usize,
-    /// `classic` or `modern`.
-    pub kind: &'static str,
+    pub kind: Kind,
     /// The folder in the archive the skin is in, as the archive writes it; empty at the root.
     pub folder: String,
     /// The folders of the other skins in the same archive, which are left out.
@@ -55,7 +59,7 @@ pub struct Info {
 }
 
 /// The skin's readme.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Readme {
     /// Its path in the archive, as the archive writes it (with any folder the skin is in).
     pub file: String,
@@ -63,14 +67,14 @@ pub struct Readme {
 }
 
 /// A text file of the author's.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Text {
     pub file: String,
     pub text: String,
 }
 
 /// What a classic skin holds.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ClassicInfo {
     /// Of the twelve bitmaps the windows are drawn from, those the skin has not.
     pub missing_sheets: Vec<String>,
@@ -87,7 +91,7 @@ pub struct ClassicInfo {
 }
 
 /// `pledit.txt`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Playlist {
     pub normal: String,
     pub current: String,
@@ -97,7 +101,7 @@ pub struct Playlist {
 }
 
 /// What a modern skin holds and how it loads.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct ModernInfo {
     /// `<skininfo>`.
     pub skin_info: SkinInfo,
@@ -119,7 +123,7 @@ pub struct ModernInfo {
 }
 
 /// `<skininfo>`: what the author says of the skin.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Serialize, JsonSchema)]
 pub struct SkinInfo {
     pub name: Option<String>,
     pub version: Option<String>,
@@ -132,7 +136,7 @@ pub struct SkinInfo {
     pub wacup_screenshot: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Container {
     pub id: String,
     pub name: Option<String>,
@@ -140,7 +144,7 @@ pub struct Container {
     pub default_visible: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct Window {
     pub container: String,
     pub layout: String,
@@ -148,7 +152,7 @@ pub struct Window {
     pub height: i32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 pub struct MissingPart {
     pub tag: String,
     pub container: String,
@@ -178,10 +182,7 @@ pub fn inspect(skin: &Skin, bytes: &[u8], name: &str, params: &Params) -> Info {
         name: name.to_string(),
         md5: format!("{:x}", Md5::digest(bytes)),
         bytes: bytes.len(),
-        kind: match skin.kind {
-            Kind::Classic => "classic",
-            Kind::Modern => "modern",
-        },
+        kind: skin.kind,
         folder: archive.folder,
         other_skins: archive.other_skins,
         dates: archive.dates,
@@ -489,7 +490,7 @@ impl Info {
                 let _ = writeln!(out, "  {label:<14}{value}");
             }
         };
-        line("kind", self.kind);
+        line("kind", self.kind.name());
         line("folder", &self.folder);
         line("other skins", &self.other_skins.join(", "));
         line("md5", &self.md5);

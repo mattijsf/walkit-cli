@@ -27,7 +27,7 @@ path = "src/main.rs"
 
 [dependencies]
 # the engine, with its TrueType letters drawn as Winamp draws them
-walkit = { version = "0.10.3", features = ["truetype"] }
+walkit = { version = "0.10.4", features = ["truetype"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "bmp", "gif", "jpeg"] }
 zip = { version = "2.6.1", default-features = false, features = ["deflate"] }
 serde = { version = "1", features = ["derive"] }

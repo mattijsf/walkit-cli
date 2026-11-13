@@ -1,36 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! What a skin is: who made it, what is in it, and what the engine makes of it.
+//! What a skin is: who made it, what is in it, and what the engine makes of it. The skin's
+//! files are read by the engine's [`walkit::info`]; this adds what the archive tells and puts
+//! it in the shape `walkit info` prints.
 //!
 //! [`Info`] is what `walkit info --json` prints for each skin. Its JSON Schema is
 //! [`schemas/info.schema.json`](https://github.com/mattijsf/walkit-cli/blob/main/schemas/info.schema.json)
 //! in the repository, made by [`crate::schema::info`].
 
 use std::fmt::Write as _;
-use std::rc::Rc;
 
 use md5::{Digest, Md5};
 use schemars::JsonSchema;
 use serde::Serialize;
-use walkit::classic::{pledit, region, viscolor};
 use walkit::draw::Rgb;
-use walkit::xml::{self, XmlNode};
+use walkit::info::{self as engine, decode, is_museum_readme};
 
 use crate::params::Params;
 use crate::shot::survey;
-use crate::skin::{Kind, Skin, CLASSIC_SHEETS};
-
-/// The bitmaps a classic skin may add to the twelve Winamp draws its windows from.
-const CLASSIC_EXTRAS: [&str; 8] = [
-    "nums_ex.bmp",
-    "eq_ex.bmp",
-    "balance.bmp",
-    "gen.bmp",
-    "genex.bmp",
-    "video.bmp",
-    "mb.bmp",
-    "avs.bmp",
-];
+use crate::skin::{Kind, Skin};
 
 /// Everything known about one skin.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -163,20 +151,16 @@ pub struct MissingPart {
 pub fn inspect(skin: &Skin, bytes: &[u8], name: &str, params: &Params) -> Info {
     let files = skin.names();
     let archive = archive(bytes);
-    let texts = files
-        .iter()
-        .filter(|f| is_text(f))
-        .filter_map(|f| {
-            let text = decode(&skin.read(f)?);
-            (!text.trim().is_empty()).then(|| Text {
-                file: f.clone(),
-                text,
-            })
+    let texts = engine::texts(skin.own_files())
+        .into_iter()
+        .map(|t| Text {
+            file: t.file,
+            text: t.text,
         })
         .collect();
     let (classic, modern) = match skin.kind {
-        Kind::Classic => (Some(classic(skin, &files)), None),
-        Kind::Modern => (None, Some(modern(skin, &files, name, params))),
+        Kind::Classic => (Some(classic(skin)), None),
+        Kind::Modern => (None, Some(modern(skin, name, params))),
     };
     Info {
         name: name.to_string(),
@@ -194,96 +178,46 @@ pub fn inspect(skin: &Skin, bytes: &[u8], name: &str, params: &Params) -> Info {
     }
 }
 
-fn classic(skin: &Skin, files: &[String]) -> ClassicInfo {
-    let has = |name: &str| skin.read(name).is_some();
-    let text = |name: &str| skin.read(name).map(|b| decode(&b));
-    let playlist = text("pledit.txt").map(|t| {
-        let s = pledit::parse(&t);
-        Playlist {
-            normal: hex(s.normal),
-            current: hex(s.current),
-            normal_bg: hex(s.normal_bg),
-            selected_bg: hex(s.selected_bg),
-            font: s.font,
-        }
-    });
-    let vis_colors = text("viscolor.txt")
-        .map(|t| viscolor::parse(&t).iter().map(|c| hex(*c)).collect())
-        .unwrap_or_default();
-    let mut regions: Vec<String> = text("region.txt")
-        .map(|t| region::parse(&t).into_keys().collect())
-        .unwrap_or_default();
-    regions.sort();
+fn classic(skin: &Skin) -> ClassicInfo {
+    let c = engine::classic(skin.own_files());
     ClassicInfo {
-        missing_sheets: CLASSIC_SHEETS
-            .iter()
-            .filter(|s| !has(s))
-            .map(|s| s.to_string())
-            .collect(),
-        extras: CLASSIC_EXTRAS
-            .iter()
-            .filter(|s| has(s))
-            .map(|s| s.to_string())
-            .collect(),
-        playlist,
-        vis_colors,
-        regions,
-        cursors: ending(files, &[".cur", ".ani"]),
+        missing_sheets: c.missing_sheets,
+        extras: c.extras,
+        playlist: c.playlist.map(|p| Playlist {
+            normal: hex(p.normal),
+            current: hex(p.current),
+            normal_bg: hex(p.normal_bg),
+            selected_bg: hex(p.selected_bg),
+            font: p.font,
+        }),
+        vis_colors: c.vis_colors.into_iter().map(hex).collect(),
+        regions: c.regions,
+        cursors: c.cursors,
     }
 }
 
-fn modern(skin: &Skin, files: &[String], name: &str, params: &Params) -> ModernInfo {
-    let mut nodes = Vec::new();
-    for text in skin.xml_files() {
-        for root in xml::parse(&text) {
-            walk(&root, &mut nodes);
-        }
-    }
-    let format_version = skin
-        .read("skin.xml")
-        .map(|b| decode(&b))
-        .and_then(|t| {
-            xml::parse(&t)
-                .into_iter()
-                .find(|r| r.name == "winampabstractionlayer" || r.name == "wasabixml")
+fn modern(skin: &Skin, name: &str, params: &Params) -> ModernInfo {
+    let m = engine::modern(skin.own_files());
+    let i = m.skin_info;
+    let skin_info = SkinInfo {
+        name: i.name,
+        version: i.version,
+        author: i.author,
+        comment: i.comment,
+        email: i.email,
+        homepage: i.homepage,
+        screenshot: i.screenshot,
+        wacup_screenshot: i.wacup_screenshot,
+    };
+    let containers = m
+        .containers
+        .into_iter()
+        .map(|c| Container {
+            id: c.id,
+            name: c.name,
+            default_visible: c.default_visible,
         })
-        .and_then(|r| r.get("version").map(str::to_string));
-    let mut skin_info = SkinInfo::default();
-    if let Some(info) = nodes.iter().find(|n| n.name == "skininfo") {
-        let field = |key: &str| {
-            let n = info.children.iter().find(|c| c.name == key)?;
-            let value = if n.text.is_empty() {
-                n.get("text").unwrap_or_default()
-            } else {
-                n.text.as_str()
-            };
-            (!value.is_empty()).then(|| value.to_string())
-        };
-        skin_info = SkinInfo {
-            name: field("name"),
-            version: field("version"),
-            author: field("author"),
-            comment: field("comment"),
-            email: field("email"),
-            homepage: field("homepage"),
-            screenshot: field("screenshot"),
-            wacup_screenshot: field("wacupscreenshot"),
-        };
-    }
-    let mut containers: Vec<Container> = Vec::new();
-    for node in nodes.iter().filter(|n| n.name == "container") {
-        let Some(id) = node.get("id").filter(|id| !id.is_empty()) else {
-            continue;
-        };
-        if containers.iter().any(|c| c.id.eq_ignore_ascii_case(id)) {
-            continue;
-        }
-        containers.push(Container {
-            id: id.to_string(),
-            name: node.get("name").map(str::to_string),
-            default_visible: node.get("default_visible").is_none_or(|v| v.trim() != "0"),
-        });
-    }
+        .collect();
     let survey = survey(skin, name, params);
     let windows = survey
         .windows
@@ -309,54 +243,15 @@ fn modern(skin: &Skin, files: &[String], name: &str, params: &Params) -> ModernI
     }
     ModernInfo {
         skin_info,
-        format_version,
+        format_version: m.format_version,
         containers,
         windows,
         color_themes: survey.color_themes,
-        scripts: ending(files, &[".maki"]),
-        fonts: ending(files, &[".ttf", ".otf"]),
+        scripts: m.scripts,
+        fonts: m.fonts,
         missing_parts,
-        plugins: skin.plugins(),
+        plugins: m.plugins,
     }
-}
-
-/// The names the museum never takes for a readme: what Winamp and its plugins read, and
-/// files download sites add. The museum's pattern anchors only its last name at the end.
-const NOT_README: [&str; 13] = [
-    "dialogs.txt",
-    "genex.txt",
-    "genexinfo.txt",
-    "gen_gslyrics.txt",
-    "region.txt",
-    "pledit.txt",
-    "viscolor.txt",
-    "winampmb.txt",
-    "\"gen_ex help.txt",
-    "mbinner.txt",
-    "winampskins.info.txt",
-    "albumlist.txt",
-    "covertag.txt",
-];
-
-/// Whether the museum takes the archive entry `name` for a readme: `getReadme` in the
-/// webamp repository's `packages/skin-database/data/SkinModel.ts` tests the entry's full
-/// name against `/(file_id\.diz)|(\.txt)$/i` and not against its list of other files.
-pub fn is_museum_readme(name: &str) -> bool {
-    let name = name.to_lowercase();
-    let readme = name.contains("file_id.diz") || name.ends_with(".txt");
-    let not =
-        NOT_README.iter().any(|n| name.contains(n)) || name.ends_with("1001winampskins.com.txt");
-    readme && !not
-}
-
-/// Whether the file at `path` is a text of the author's: a `.txt`, `.nfo` or `.diz` that
-/// neither Winamp nor a plugin reads.
-fn is_text(path: &str) -> bool {
-    let name = base_name(path);
-    let text = [".txt", ".nfo", ".diz"].iter().any(|e| name.ends_with(e));
-    let read_by_winamp = NOT_README.contains(&name.as_str())
-        || ["viscolor.txt", "gen_ex help.txt", "1001winampskins.com.txt"].contains(&name.as_str());
-    text && !read_by_winamp
 }
 
 /// What the archive itself tells, beyond the skin's files.
@@ -426,55 +321,6 @@ fn archive(bytes: &[u8]) -> Archive {
         out.other_skins = folders;
     }
     out
-}
-
-/// Every element under `node`, itself first.
-fn walk(node: &Rc<XmlNode>, out: &mut Vec<Rc<XmlNode>>) {
-    out.push(node.clone());
-    for c in &node.children {
-        walk(c, out);
-    }
-}
-
-/// The files whose names end in one of `endings`.
-fn ending(files: &[String], endings: &[&str]) -> Vec<String> {
-    files
-        .iter()
-        .filter(|f| {
-            let lower = f.to_ascii_lowercase();
-            endings.iter().any(|e| lower.ends_with(e))
-        })
-        .cloned()
-        .collect()
-}
-
-/// The last part of a path, in lower case.
-fn base_name(path: &str) -> String {
-    path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase()
-}
-
-/// What Windows' Western code page (1252) has at 0x80 to 0x9f, where Latin-1 has control
-/// characters; the five it leaves out stay as they are.
-const CP1252_HIGH: [char; 32] = [
-    '€', '\u{81}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{8d}', 'Ž', '\u{8f}',
-    '\u{90}', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '\u{9d}', 'ž', 'Ÿ',
-];
-
-/// Text as skins write it: UTF-8, or else Windows' Western code page (1252).
-fn decode(bytes: &[u8]) -> String {
-    let text = match std::str::from_utf8(bytes) {
-        Ok(text) => text.to_string(),
-        Err(_) => bytes
-            .iter()
-            .map(|b| match b {
-                0x80..=0x9f => CP1252_HIGH[(b - 0x80) as usize],
-                b => *b as char,
-            })
-            .collect(),
-    };
-    text.trim_start_matches('\u{FEFF}')
-        .replace("\r\n", "\n")
-        .replace('\r', "\n")
 }
 
 fn hex(c: Rgb) -> String {

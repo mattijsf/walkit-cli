@@ -31,23 +31,6 @@ const FONTS: [(&str, &[u8]); 4] = [
     ),
 ];
 
-/// The bitmaps Winamp draws a classic skin's three windows from. `nums_ex.bmp` and
-/// `balance.bmp` are left out: `numbers.bmp` and `volume.bmp` stand in for them.
-pub(crate) const CLASSIC_SHEETS: [&str; 12] = [
-    "main.bmp",
-    "cbuttons.bmp",
-    "titlebar.bmp",
-    "shufrep.bmp",
-    "text.bmp",
-    "volume.bmp",
-    "monoster.bmp",
-    "playpaus.bmp",
-    "posbar.bmp",
-    "numbers.bmp",
-    "eqmain.bmp",
-    "pledit.bmp",
-];
-
 /// The files of a zip archive in memory. A skin zipped inside a folder has that folder
 /// stripped.
 pub fn unzip(bytes: &[u8]) -> Result<MemoryFiles, String> {
@@ -255,7 +238,7 @@ impl Skin {
         if self.kind != Kind::Classic || self.under.is_some() {
             return Vec::new();
         }
-        CLASSIC_SHEETS
+        walkit::info::CLASSIC_SHEETS
             .into_iter()
             .filter(|sheet| !self.archive.exists(sheet))
             .collect()
@@ -302,28 +285,12 @@ impl Skin {
         if self.kind != Kind::Modern {
             return Vec::new();
         }
-        let mut plugins = Vec::new();
-        for text in self.xml_files() {
-            let lower = text.to_ascii_lowercase();
-            for (at, _) in lower.match_indices("<include") {
-                let tag = &text[at..];
-                let tag = &tag[..tag.find('>').unwrap_or(tag.len())];
-                let path = tag.replace('\\', "/");
-                let Some(start) = path.to_ascii_lowercase().find("/plugins/") else {
-                    continue;
-                };
-                let rest = &path[start + "/plugins/".len()..];
-                let name: String = rest
-                    .chars()
-                    .take_while(|c| *c != '/' && *c != '"' && *c != '\'')
-                    .collect();
-                if !name.is_empty() && !plugins.contains(&name) {
-                    plugins.push(name);
-                }
-            }
-        }
-        plugins.sort();
-        plugins
+        walkit::info::modern(&self.archive).plugins
+    }
+
+    /// The files of the skin's own archive, without the base or the fonts under them.
+    pub fn own_files(&self) -> &MemoryFiles {
+        &self.archive
     }
 
     /// The paths of the files in the skin's own archive, sorted.
@@ -339,7 +306,7 @@ impl Skin {
     }
 
     /// The text of the skin's own XML files.
-    pub(crate) fn xml_files(&self) -> Vec<String> {
+    fn xml_files(&self) -> Vec<String> {
         self.archive
             .names()
             .into_iter()

@@ -16,8 +16,9 @@ use crate::shot::survey;
 use crate::skin::{Kind, Skin, CLASSIC_SHEETS};
 
 /// The bitmaps a classic skin may add to the twelve Winamp draws its windows from.
-const CLASSIC_EXTRAS: [&str; 7] = [
+const CLASSIC_EXTRAS: [&str; 8] = [
     "nums_ex.bmp",
+    "eq_ex.bmp",
     "balance.bmp",
     "gen.bmp",
     "genex.bmp",
@@ -25,9 +26,6 @@ const CLASSIC_EXTRAS: [&str; 7] = [
     "mb.bmp",
     "avs.bmp",
 ];
-
-/// The text files Winamp reads settings from; any other is the author's.
-const SETTINGS_TEXTS: [&str; 3] = ["pledit.txt", "viscolor.txt", "region.txt"];
 
 /// Everything known about one skin.
 #[derive(Debug, Serialize)]
@@ -38,7 +36,13 @@ pub struct Info {
     pub bytes: usize,
     /// `classic` or `modern`.
     pub kind: &'static str,
-    /// The files in the archive, by path.
+    /// The folder in the archive the skin is in, as the archive writes it; empty at the root.
+    pub folder: String,
+    /// The folders of the other skins in the same archive, which are left out.
+    pub other_skins: Vec<String>,
+    /// The earliest and the latest date of the archive's files, as `YYYY-MM-DD HH:MM:SS`.
+    pub dates: Option<[String; 2]>,
+    /// The files of the skin, by path in its folder.
     pub files: Vec<String>,
     /// The readme, picked as the Winamp Skin Museum picks it; `None` when no file qualifies.
     pub readme: Option<Readme>,
@@ -124,6 +128,8 @@ pub struct SkinInfo {
     pub email: Option<String>,
     pub homepage: Option<String>,
     pub screenshot: Option<String>,
+    /// The screenshot WACUP shows (`<wacupscreenshot>`).
+    pub wacup_screenshot: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -152,10 +158,10 @@ pub struct MissingPart {
 /// into the engine, staged as `params` describe.
 pub fn inspect(skin: &Skin, bytes: &[u8], name: &str, params: &Params) -> Info {
     let files = skin.names();
+    let archive = archive(bytes);
     let texts = files
         .iter()
-        .filter(|f| f.to_ascii_lowercase().ends_with(".txt"))
-        .filter(|f| !SETTINGS_TEXTS.contains(&base_name(f).as_str()))
+        .filter(|f| is_text(f))
         .filter_map(|f| {
             let text = decode(&skin.read(f)?);
             (!text.trim().is_empty()).then(|| Text {
@@ -176,8 +182,11 @@ pub fn inspect(skin: &Skin, bytes: &[u8], name: &str, params: &Params) -> Info {
             Kind::Classic => "classic",
             Kind::Modern => "modern",
         },
+        folder: archive.folder,
+        other_skins: archive.other_skins,
+        dates: archive.dates,
         files,
-        readme: readme(bytes),
+        readme: archive.readme,
         texts,
         classic,
         modern,
@@ -257,6 +266,7 @@ fn modern(skin: &Skin, files: &[String], name: &str, params: &Params) -> ModernI
             email: field("email"),
             homepage: field("homepage"),
             screenshot: field("screenshot"),
+            wacup_screenshot: field("wacupscreenshot"),
         };
     }
     let mut containers: Vec<Container> = Vec::new();
@@ -338,26 +348,96 @@ pub fn is_museum_readme(name: &str) -> bool {
     readme && !not
 }
 
-/// The first entry of the archive, in the archive's order, the museum takes for a readme.
-fn readme(bytes: &[u8]) -> Option<Readme> {
-    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).ok()?;
+/// Whether the file at `path` is a text of the author's: a `.txt`, `.nfo` or `.diz` that
+/// neither Winamp nor a plugin reads.
+fn is_text(path: &str) -> bool {
+    let name = base_name(path);
+    let text = [".txt", ".nfo", ".diz"].iter().any(|e| name.ends_with(e));
+    let read_by_winamp = NOT_README.contains(&name.as_str())
+        || ["viscolor.txt", "gen_ex help.txt", "1001winampskins.com.txt"].contains(&name.as_str());
+    text && !read_by_winamp
+}
+
+/// What the archive itself tells, beyond the skin's files.
+struct Archive {
+    folder: String,
+    other_skins: Vec<String>,
+    dates: Option<[String; 2]>,
+    readme: Option<Readme>,
+}
+
+/// Reads the archive's entries in its own order: the folders that hold a skin, the files'
+/// dates, and the first entry the museum takes for a readme.
+fn archive(bytes: &[u8]) -> Archive {
+    let mut out = Archive {
+        folder: String::new(),
+        other_skins: Vec::new(),
+        dates: None,
+        readme: None,
+    };
+    let Ok(mut zip) = zip::ZipArchive::new(std::io::Cursor::new(bytes)) else {
+        return out;
+    };
+    let mut names = Vec::new();
+    let mut dates = Vec::new();
     for i in 0..zip.len() {
         let Ok(mut entry) = zip.by_index(i) else {
             continue;
         };
-        let name = entry.name().to_string();
-        if entry.is_dir() || !is_museum_readme(&name) {
+        if entry.is_dir() {
             continue;
         }
-        let mut text = Vec::new();
-        std::io::Read::read_to_end(&mut std::io::Read::take(&mut entry, 1 << 20), &mut text)
-            .ok()?;
-        return Some(Readme {
-            file: name,
-            text: decode(&text),
-        });
+        let name = entry.name().replace('\\', "/");
+        if let Some(d) = entry
+            .last_modified()
+            .filter(|d| d.month() > 0 && d.day() > 0)
+        {
+            dates.push(format!(
+                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                d.year(),
+                d.month(),
+                d.day(),
+                d.hour(),
+                d.minute(),
+                d.second()
+            ));
+        }
+        if out.readme.is_none() && is_museum_readme(entry.name()) {
+            let mut text = Vec::new();
+            if std::io::Read::read_to_end(&mut std::io::Read::take(&mut entry, 1 << 20), &mut text)
+                .is_ok()
+            {
+                out.readme = Some(Readme {
+                    file: entry.name().to_string(),
+                    text: decode(&text),
+                });
+            }
+        }
+        names.push(name);
     }
-    None
+    dates.sort();
+    if let (Some(first), Some(last)) = (dates.first(), dates.last()) {
+        out.dates = Some([first.clone(), last.clone()]);
+    }
+    // as the engine picks the folder: the first that holds skin.xml, else main.bmp
+    for marker in ["skin.xml", "main.bmp"] {
+        let mut folders: Vec<String> = Vec::new();
+        for name in &names {
+            let lower = name.to_lowercase();
+            if lower == marker || lower.ends_with(&format!("/{marker}")) {
+                let folder = name[..name.len() - marker.len()].to_string();
+                if !folders.contains(&folder) {
+                    folders.push(folder);
+                }
+            }
+        }
+        if !folders.is_empty() {
+            out.folder = folders.remove(0);
+            out.other_skins = folders;
+            break;
+        }
+    }
+    out
 }
 
 /// Every element under `node`, itself first.
@@ -423,11 +503,23 @@ impl Info {
             }
         };
         line("kind", self.kind);
+        line("folder", &self.folder);
+        line("other skins", &self.other_skins.join(", "));
         line("md5", &self.md5);
         line(
             "size",
             &format!("{} bytes, {} files", self.bytes, self.files.len()),
         );
+        if let Some([first, last]) = &self.dates {
+            line(
+                "file dates",
+                &if first == last {
+                    first.clone()
+                } else {
+                    format!("{first} to {last}")
+                },
+            );
+        }
         if let Some(m) = &self.modern {
             let i = &m.skin_info;
             for (label, value) in [
@@ -438,6 +530,7 @@ impl Info {
                 ("email", &i.email),
                 ("homepage", &i.homepage),
                 ("screenshot", &i.screenshot),
+                ("wacup shot", &i.wacup_screenshot),
                 ("format", &m.format_version),
             ] {
                 line(label, value.as_deref().unwrap_or_default());

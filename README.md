@@ -135,13 +135,15 @@ walkit info Bento.wal
 walkit info --json skins/ > skins.json
 ```
 
-prints what is known about a skin: its md5 and files, its readme, the author's other text
-files, and by kind:
+prints what is known about a skin: its md5 and files, the folder in the archive it is in and
+any other skins packed beside it, the earliest and latest file dates, its readme, the
+author's other text files (`.txt`, `.nfo`, `.diz`, but not those Winamp or a plugin reads),
+and by kind:
 
 - a classic skin: the bitmaps it lacks and the optional ones it has, the playlist's colours
   and font from `pledit.txt`, the 24 vis colours, the windows `region.txt` shapes, and its
   cursors.
-- a modern skin: what `<skininfo>` says (title, version, author, comment, email, homepage),
+- a modern skin: what `<skininfo>` says (title, version, author, comment, email, homepage, screenshots),
   the format version, its containers, the windows that open once it has loaded and their
   sizes, its colour themes, scripts and fonts, the parts of drawn windows nothing defines
   (such as `wasabi:standardframe:status` without `--wasabi`), and the plugin it is made for.

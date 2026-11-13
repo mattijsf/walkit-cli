@@ -377,6 +377,7 @@ fn info_reads_a_classic_skins_settings() {
     assert_eq!(info["kind"], "classic");
     let classic = &info["classic"];
     assert_eq!(classic["missing_sheets"], serde_json::json!([]));
+    assert_eq!(info["folder"], "");
     assert_eq!(classic["playlist"]["font"], "Arial");
     assert_eq!(classic["vis_colors"].as_array().unwrap().len(), 24);
 }
@@ -454,4 +455,41 @@ fn info_picks_the_readme_as_the_museum_does() {
         "{}",
         text(&result.stdout)
     );
+}
+
+#[test]
+fn info_tells_where_in_the_archive_the_skin_is() {
+    let dir = Scratch::new("info-folders");
+    let skin = dir.path("pack.wal");
+    let modern = std::fs::read(MODERN).unwrap();
+    let mut from = zip::ZipArchive::new(std::io::Cursor::new(modern)).unwrap();
+    let mut out = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    let options = zip::write::SimpleFileOptions::default()
+        .last_modified_time(zip::DateTime::from_date_and_time(2004, 5, 6, 7, 8, 10).unwrap());
+    // two skins in one archive: the first folder with a skin.xml is the one read
+    for folder in ["Blue/", "Red/"] {
+        for i in 0..from.len() {
+            let entry = from.by_index(i).unwrap();
+            let name = format!("{folder}{}", entry.name());
+            out.raw_copy_file_rename(entry, name).unwrap();
+        }
+    }
+    out.start_file("Blue/genex.txt", options).unwrap();
+    out.write_all(b"settings").unwrap();
+    out.start_file("Blue/whatsnew.nfo", options).unwrap();
+    out.write_all(b"news").unwrap();
+    out.finish().unwrap();
+    let result = run(&["info", "--json", skin.to_str().unwrap()]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    let info: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(info["folder"], "Blue/");
+    assert_eq!(info["other_skins"], serde_json::json!(["Red/"]));
+    assert_eq!(info["dates"][0], "2004-05-06 07:08:10");
+    assert_eq!(
+        info["texts"],
+        serde_json::json!([{"file": "whatsnew.nfo", "text": "news"}])
+    );
+    let result = run(&["info", skin.to_str().unwrap()]);
+    let out = text(&result.stdout);
+    assert!(out.contains("other skins   Red/"), "{out}");
 }

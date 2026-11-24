@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/mattijsf/walkit-cli/compare/v0.1.4...v0.1.5) (2026-11-24)
+
+
+### Features
+
+* walkit unpack and walkit pack turn skins into folders and back, one or many at once ([#14](https://github.com/mattijsf/walkit-cli/issues/14)) ([a67284d](https://github.com/mattijsf/walkit-cli/commit/a67284deaa00ddd6f8faa8725f1d40755c535a8f))
+
 ## [0.1.4](https://github.com/mattijsf/walkit-cli/compare/v0.1.3...v0.1.4) (2026-11-13)
 
 

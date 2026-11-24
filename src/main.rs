@@ -12,6 +12,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use md5::{Digest, Md5};
 use walkit::files::MemoryFiles;
 
+use walkit_cli::archive;
 use walkit_cli::compare::compare;
 use walkit_cli::info;
 use walkit_cli::input::{self, Source};
@@ -45,6 +46,58 @@ enum Command {
     /// Print what is known about skins: who made them, what is in them, and what the
     /// engine makes of them.
     Info(Info),
+    /// Unpack skins into folders, one folder per skin, to edit their files.
+    Unpack(Unpack),
+    /// Pack folders back into skins: a folder that holds a skin, or a folder of them.
+    Pack(Pack),
+}
+
+#[derive(clap::Args)]
+struct Unpack {
+    /// Skins: .wsz or .wal files, http(s) addresses, or folders of skins.
+    #[arg(required = true)]
+    inputs: Vec<String>,
+    /// Also search the folders under a folder.
+    #[arg(short, long)]
+    recursive: bool,
+    /// The folder the skins' folders go in, each named after its skin.
+    #[arg(short = 'd', long, value_name = "DIR", default_value = ".")]
+    out_dir: PathBuf,
+    /// Write into a skin's folder that is already there: its files are replaced, the others
+    /// stay.
+    #[arg(short, long)]
+    force: bool,
+    /// Print failures only.
+    #[arg(short, long)]
+    quiet: bool,
+}
+
+#[derive(clap::Args)]
+struct Pack {
+    /// Folders: each a skin (a skin.xml or a main.bmp in it, or in its only folder), or a
+    /// folder of such folders.
+    #[arg(required = true)]
+    folders: Vec<PathBuf>,
+    /// The folder the skins go in, each named after its folder.
+    #[arg(short = 'd', long, value_name = "DIR", default_value = ".")]
+    out_dir: PathBuf,
+    /// What the skins are written as. Without it, .wal for a skin with a skin.xml and .wsz
+    /// for the others.
+    #[arg(long, value_enum)]
+    ext: Option<Ext>,
+    /// Replace a skin that is already there.
+    #[arg(short, long)]
+    force: bool,
+    /// Print failures only.
+    #[arg(short, long)]
+    quiet: bool,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Ext {
+    Wsz,
+    Wal,
+    Zip,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -174,6 +227,8 @@ fn main() -> ExitCode {
             .expect("a thread")
             .join()
             .unwrap_or_else(|_| Err("the engine stopped".into())),
+        Command::Unpack(args) => run_unpack(&args),
+        Command::Pack(args) => run_pack(&args),
     };
     match result {
         Ok(true) => ExitCode::SUCCESS,
@@ -254,13 +309,7 @@ fn render(args: Render) -> Result<bool, String> {
                 (Some(path), _) => Some(path.clone()),
                 (None, Naming::Md5) => None,
                 (None, Naming::Stem) => {
-                    let stem = file_name(&source.name());
-                    let mut name = stem.clone();
-                    let mut n = 1;
-                    while !taken.insert(name.to_lowercase()) {
-                        n += 1;
-                        name = format!("{stem}-{n}");
-                    }
+                    let name = unique(file_name(&source.name()), &mut taken);
                     Some(out_dir.join(format!("{name}.png")))
                 }
             };
@@ -366,6 +415,113 @@ fn run_info(args: Info) -> Result<bool, String> {
         }
     }
     Ok(ok)
+}
+
+/// `name`, or when another of the batch took it, `name-2`, `name-3` and so on, as file
+/// systems that ignore case see it.
+fn unique(name: String, taken: &mut HashSet<String>) -> String {
+    let mut unique = name.clone();
+    let mut n = 1;
+    while !taken.insert(unique.to_lowercase()) {
+        n += 1;
+        unique = format!("{name}-{n}");
+    }
+    unique
+}
+
+/// Unpacks the skins; `Ok(false)` when any failed.
+fn run_unpack(args: &Unpack) -> Result<bool, String> {
+    let sources = input::expand(&args.inputs, args.recursive)?;
+    if sources.is_empty() {
+        return Err("no skins to unpack".into());
+    }
+    let mut taken = HashSet::new();
+    let mut failed = 0;
+    for source in &sources {
+        let dir = args
+            .out_dir
+            .join(unique(file_name(&source.name()), &mut taken));
+        let result = source
+            .read()
+            .and_then(|bytes| archive::unpack(&bytes, &dir, args.force));
+        match result {
+            Ok(unpacked) => {
+                for line in &unpacked.skipped {
+                    eprintln!("warning: {source}: left out {line}");
+                }
+                if !args.quiet {
+                    println!("{source} -> {} ({} files)", dir.display(), unpacked.files);
+                }
+            }
+            Err(message) => {
+                failed += 1;
+                eprintln!("failed: {source}: {message}");
+            }
+        }
+    }
+    if sources.len() > 1 && !args.quiet {
+        println!("{} unpacked, {failed} failed", sources.len() - failed);
+    }
+    Ok(failed == 0)
+}
+
+/// Packs the folders into skins; `Ok(false)` when any failed.
+fn run_pack(args: &Pack) -> Result<bool, String> {
+    let mut folders = Vec::new();
+    let mut not_skins = 0;
+    for folder in &args.folders {
+        match archive::skin_folders(folder) {
+            Ok(found) => folders.extend(found),
+            Err(message) => {
+                not_skins += 1;
+                eprintln!("failed: {message}");
+            }
+        }
+    }
+    let mut failed = not_skins;
+    std::fs::create_dir_all(&args.out_dir)
+        .map_err(|e| format!("{}: {e}", args.out_dir.display()))?;
+    let mut taken = HashSet::new();
+    for folder in &folders {
+        let ending = match args.ext {
+            Some(Ext::Wsz) => archive::Ending::Wsz,
+            Some(Ext::Wal) => archive::Ending::Wal,
+            Some(Ext::Zip) => archive::Ending::Zip,
+            None => archive::skin_kind(folder).unwrap_or(archive::Ending::Wsz),
+        };
+        // a folder given as `.` or `skins/` is named by its full path
+        let full = std::path::absolute(folder).unwrap_or_else(|_| folder.clone());
+        let stem = full
+            .components()
+            .next_back()
+            .map(|c| c.as_os_str().to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let name = unique(file_name(&stem), &mut taken);
+        let path = args.out_dir.join(format!("{name}.{}", ending.name()));
+        let result = if path.exists() && !args.force {
+            Err(format!("{} is there; --force replaces it", path.display()))
+        } else {
+            archive::pack(folder).and_then(|bytes| {
+                std::fs::write(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))
+            })
+        };
+        match result {
+            Ok(()) => {
+                if !args.quiet {
+                    println!("{} -> {}", folder.display(), path.display());
+                }
+            }
+            Err(message) => {
+                failed += 1;
+                eprintln!("failed: {}: {message}", folder.display());
+            }
+        }
+    }
+    let count = folders.len() + not_skins;
+    if count > 1 && !args.quiet {
+        println!("{} packed, {failed} failed", count - failed);
+    }
+    Ok(failed == 0)
 }
 
 /// A skin's name as a file name: what a file system refuses is replaced.

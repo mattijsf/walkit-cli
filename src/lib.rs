@@ -3,6 +3,7 @@
 //! Renders preview images of Winamp skins with the walkit engine: a classic (`.wsz`) or
 //! modern (`.wal`) skin in, a PNG out, in the state a parameter file describes.
 
+pub mod archive;
 pub mod compare;
 pub mod host;
 pub mod info;

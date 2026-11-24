@@ -547,3 +547,168 @@ fn a_pack_of_skins_says_it_is_no_single_skin() {
     assert_eq!(info["folder"], "");
     assert_eq!(info["other_skins"], serde_json::json!(["2003/"]));
 }
+
+/// The files of an archive, by name, as bytes.
+fn entries(path: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut zip = zip::ZipArchive::new(std::fs::File::open(path).unwrap()).unwrap();
+    let mut files = Vec::new();
+    for i in 0..zip.len() {
+        let mut entry = zip.by_index(i).unwrap();
+        if entry.is_dir() {
+            continue;
+        }
+        let mut bytes = Vec::new();
+        entry.read_to_end(&mut bytes).unwrap();
+        files.push((entry.name().to_string(), bytes));
+    }
+    files.sort();
+    files
+}
+
+#[test]
+fn a_skin_unpacked_and_packed_again_has_the_same_files_and_picture() {
+    let dir = Scratch::new("repack");
+    let unpacked = dir.path("unpacked");
+    let result = run(&["unpack", "tests/skins", "-d", unpacked.to_str().unwrap()]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    assert!(text(&result.stdout).contains("2 unpacked, 0 failed"));
+    assert!(unpacked.join("walkit-classic/main.bmp").is_file());
+    // a desktop's own files are not packed
+    std::fs::write(unpacked.join("walkit-modern/.DS_Store"), b"junk").unwrap();
+    // the folder of skins packs each skin in it, named and ended after what it holds
+    let packed = dir.path("packed");
+    let result = run(&[
+        "pack",
+        unpacked.to_str().unwrap(),
+        "-d",
+        packed.to_str().unwrap(),
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    assert!(text(&result.stdout).contains("2 packed, 0 failed"));
+    for skin in [CLASSIC, MODERN] {
+        let name = Path::new(skin).file_name().unwrap();
+        assert_eq!(
+            entries(&packed.join(name)),
+            entries(Path::new(skin)),
+            "{skin}"
+        );
+        let a = dir.path("a.png");
+        let b = dir.path("b.png");
+        run(&["render", skin, "-o", a.to_str().unwrap()]);
+        let again = packed.join(name);
+        run(&["render", again.to_str().unwrap(), "-o", b.to_str().unwrap()]);
+        let result = run(&[
+            "compare",
+            a.to_str().unwrap(),
+            b.to_str().unwrap(),
+            "--min-same",
+            "100",
+        ]);
+        assert!(result.status.success(), "{}", text(&result.stdout));
+    }
+    // the same files pack to the same bytes, and a skin that is there is kept
+    let first = std::fs::read(packed.join("walkit-classic.wsz")).unwrap();
+    let skin = unpacked.join("walkit-classic");
+    let result = run(&[
+        "pack",
+        skin.to_str().unwrap(),
+        "-d",
+        packed.to_str().unwrap(),
+    ]);
+    assert_eq!(result.status.code(), Some(1));
+    assert!(text(&result.stderr).contains("--force replaces it"));
+    let result = run(&[
+        "pack",
+        skin.to_str().unwrap(),
+        "-d",
+        packed.to_str().unwrap(),
+        "-f",
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    assert_eq!(
+        std::fs::read(packed.join("walkit-classic.wsz")).unwrap(),
+        first
+    );
+    // a folder that is there is only written into with --force
+    let result = run(&["unpack", CLASSIC, "-d", unpacked.to_str().unwrap()]);
+    assert_eq!(result.status.code(), Some(1));
+    assert!(text(&result.stderr).contains("--force writes into it"));
+    let result = run(&["unpack", CLASSIC, "-d", unpacked.to_str().unwrap(), "-f"]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+}
+
+#[test]
+fn a_skin_in_a_folder_packs_as_it_unpacked() {
+    let dir = Scratch::new("repack-folder");
+    let skin = dir.path("Blue.wal");
+    pack(&skin, &["Blue/"]);
+    let unpacked = dir.path("unpacked");
+    let result = run(&[
+        "unpack",
+        skin.to_str().unwrap(),
+        "-d",
+        unpacked.to_str().unwrap(),
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    assert!(unpacked.join("Blue/Blue/skin.xml").is_file());
+    // the skin is in the folder's only folder: it is still one skin, and modern
+    let folder = unpacked.join("Blue");
+    let result = run(&[
+        "pack",
+        folder.to_str().unwrap(),
+        "-d",
+        dir.path("out").to_str().unwrap(),
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    assert_eq!(entries(&dir.path("out/Blue.wal")), entries(&skin));
+    // --ext names what it is written as
+    let result = run(&[
+        "pack",
+        folder.to_str().unwrap(),
+        "-d",
+        dir.path("out").to_str().unwrap(),
+        "--ext",
+        "zip",
+    ]);
+    assert!(result.status.success(), "{}", text(&result.stderr));
+    assert!(dir.path("out/Blue.zip").is_file());
+    // a folder with no skin fails
+    let empty = dir.path("empty");
+    std::fs::create_dir_all(&empty).unwrap();
+    let result = run(&[
+        "pack",
+        empty.to_str().unwrap(),
+        "-d",
+        dir.path("out").to_str().unwrap(),
+    ]);
+    assert_eq!(result.status.code(), Some(1));
+    assert!(text(&result.stderr).contains("no skin in it"));
+}
+
+#[test]
+fn an_archive_that_would_write_outside_its_folder_unpacks_nothing() {
+    let dir = Scratch::new("zip-slip");
+    let skin = dir.path("evil.wsz");
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&skin).unwrap());
+    let options = zip::write::SimpleFileOptions::default();
+    zip.start_file("main.bmp", options).unwrap();
+    zip.write_all(b"BM").unwrap();
+    zip.start_file("../../escaped.txt", options).unwrap();
+    zip.write_all(b"out").unwrap();
+    zip.finish().unwrap();
+    let out = dir.path("out");
+    let result = run(&[
+        "unpack",
+        skin.to_str().unwrap(),
+        "-d",
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(result.status.code(), Some(1));
+    assert!(
+        text(&result.stderr).contains("would land outside the folder"),
+        "{}",
+        text(&result.stderr)
+    );
+    assert!(!out.join("evil").exists());
+    assert!(!dir.path("escaped.txt").exists());
+}

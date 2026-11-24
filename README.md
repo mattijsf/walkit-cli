@@ -103,7 +103,8 @@ A `.wal` or `.wsz` holds one skin, at its root or in one folder. Some archives a
 several skins in sibling folders, zipped to be unpacked into Winamp's skin folder by hand;
 a skin in such a pack may take files from a sibling (`../WinampXP/xml/...`). walkit reads
 the first folder only and warns that the archive is a pack. A skin at the root is the
-archive's skin, as in Winamp, and folders beside it are only more files.
+archive's skin, as in Winamp, and folders beside it are only more files. `walkit unpack` takes a
+pack apart, and `walkit pack` makes a skin of each folder.
 
 Both options take a file or an address. Neither file ships with this repository: they are
 Winamp's art.
@@ -165,6 +166,39 @@ shows no readme for modern skins; `info` picks one by the same rule.
 same files under the skins as for `render`. Each object follows the JSON Schema in
 [`schemas/info.schema.json`](schemas/info.schema.json) (`walkit schema info` prints it),
 which describes every field.
+
+### Unpacking and packing skins
+
+`unpack` puts each skin's files in a folder named after the skin, to look at or edit them.
+`pack` zips a folder back into a skin:
+
+```
+walkit unpack "Blue Steel.wsz"            # Blue Steel/main.bmp, Blue Steel/cbuttons.bmp, ...
+walkit pack "Blue Steel" -d packed        # packed/Blue Steel.wsz
+```
+
+Both take many at once. `unpack` takes skins, addresses and folders of skins (`-r` for the
+folders under them) as `render` does. `pack` takes folders: a folder that holds a skin (a
+`skin.xml` or a `main.bmp` in it, or in its only folder) is one skin, and any other folder
+is searched for the folders in it that hold one. So a folder of unpacked skins packs back
+into a folder of skins:
+
+```
+walkit unpack skins/ -d unpacked
+walkit pack unpacked/ -d packed
+```
+
+A skin with a `skin.xml` is packed as `.wal`, any other as `.wsz`; `--ext wsz|wal|zip` says
+which. Neither command overwrites: `unpack` stops at a skin's folder that is there and not
+empty, `pack` at a skin file that is there, unless `--force` is given. With `--force`,
+`unpack` writes the skin's files into the folder and leaves its other files alone.
+
+A packed skin holds the folder's files at their paths in it, with the same date and
+permissions on every entry, so the same files always pack to the same bytes. A skin
+unpacked and packed again holds the same files as before. The files a desktop leaves
+(`.DS_Store`, `Thumbs.db`, `desktop.ini`, `__MACOSX`, `._` files) are left out. An archive
+with a path that would land outside its folder (`../`) is not unpacked at all. An entry
+that does not unpack is left out with a warning, as Winamp leaves out a broken file.
 
 ## The parameter file
 

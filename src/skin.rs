@@ -8,8 +8,8 @@ use std::rc::Rc;
 use walkit::files::{self, LayeredFiles, MemoryFiles, SkinFiles};
 
 /// The largest file read out of an archive, and the most read in all.
-const MAX_ENTRY: u64 = 32 * 1024 * 1024;
-const MAX_TOTAL: u64 = 256 * 1024 * 1024;
+pub(crate) const MAX_ENTRY: u64 = 32 * 1024 * 1024;
+pub(crate) const MAX_TOTAL: u64 = 256 * 1024 * 1024;
 
 /// The free fonts that stand in for Arial and Tahoma, with the paths the engine reads them at.
 const FONTS: [(&str, &[u8]); 4] = [
